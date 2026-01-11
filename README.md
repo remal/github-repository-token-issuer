@@ -87,7 +87,7 @@ jobs:
     steps:
     - name: Get GitHub Token
       id: get-token
-      uses: your-org/github-repository-token-issuer@main
+      uses: remal/github-repository-token-issuer@main
       with:
         scopes: |
           contents:write
