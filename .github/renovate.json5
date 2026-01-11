@@ -18,6 +18,9 @@
       matchDepTypes: [
         "indirect"
       ],
+      major: {
+        enabled: false,
+      },
       enabled: true
     },
     {
