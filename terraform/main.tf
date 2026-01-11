@@ -9,7 +9,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "your-terraform-state-bucket" # Update this with your GCS bucket name
+    bucket = "github-repository-token-issuer-terraform-state"
     prefix = "github-repository-token-issuer"
   }
 }
@@ -19,81 +19,83 @@ provider "google" {
   region  = var.region
 }
 
-# Service Account for Cloud Run
-resource "google_service_account" "cloud_run_sa" {
+# Service Account for Cloud Function
+resource "google_service_account" "cloud_function_sa" {
   account_id   = "github-repository-token-issuer-sa"
   display_name = "GitHub Repository Token Issuer Service Account"
-  description  = "Service account for github-repository-token-issuer Cloud Run service"
+  description  = "Service account for github-repository-token-issuer Cloud Function"
 }
 
 # Grant Secret Manager access to service account
 resource "google_secret_manager_secret_iam_member" "secret_accessor" {
   secret_id = "github-app-private-key"
   role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+  member    = "serviceAccount:${google_service_account.cloud_function_sa.email}"
 }
 
-# Cloud Run Service (2nd generation)
-resource "google_cloud_run_v2_service" "github_token_issuer" {
+# Storage bucket for Cloud Function source code
+resource "google_storage_bucket" "function_source" {
+  name                        = "${var.project_id}-github-token-issuer-source"
+  location                    = var.region
+  uniform_bucket_level_access = true
+  force_destroy               = true
+}
+
+# Cloud Function (2nd generation)
+resource "google_cloudfunctions2_function" "github_token_issuer" {
   name     = "github-repository-token-issuer"
   location = var.region
-  ingress  = "INGRESS_TRAFFIC_ALL"
 
-  template {
-    service_account = google_service_account.cloud_run_sa.email
-
-    scaling {
-      min_instance_count = 0
-      max_instance_count = 10
-    }
-
-    containers {
-      image = "${var.region}-docker.pkg.dev/${var.project_id}/github-repository-token-issuer/app:latest"
-
-      env {
-        name  = "GITHUB_APP_ID"
-        value = var.github_app_id
-      }
-
-      resources {
-        limits = {
-          cpu    = "1"
-          memory = "512Mi"
-        }
-        cpu_idle = true
-      }
-
-      ports {
-        container_port = 8080
+  build_config {
+    runtime     = "go125"
+    entry_point = "TokenHandler"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.function_source.name
+        object = google_storage_bucket_object.function_source_archive.name
       }
     }
-
-    max_instance_request_concurrency = 80
   }
 
-  lifecycle {
-    ignore_changes = [
-      template[0].containers[0].image,
-    ]
+  service_config {
+    max_instance_count    = 10
+    min_instance_count    = 0
+    available_memory      = "512Mi"
+    timeout_seconds       = 60
+    service_account_email = google_service_account.cloud_function_sa.email
+
+    environment_variables = {
+      GITHUB_APP_ID = var.github_app_id
+    }
   }
 }
 
-# Artifact Registry repository for container images
-resource "google_artifact_registry_repository" "container_repo" {
-  location      = var.region
-  repository_id = "github-repository-token-issuer"
-  description   = "Container repository for GitHub Repository Token Issuer"
-  format        = "DOCKER"
+# Archive function source code for deployment
+data "archive_file" "function_source" {
+  type        = "zip"
+  source_dir  = "${path.module}/../function"
+  output_path = "${path.module}/function-source.zip"
+  excludes = [
+    "go.sum",
+  ]
 }
 
-# IAM binding to allow GitHub OIDC tokens to invoke Cloud Run
-# This allows any repository to invoke the Cloud Run service
+# Upload function source to GCS
+resource "google_storage_bucket_object" "function_source_archive" {
+  name   = "function-source-${data.archive_file.function_source.output_md5}.zip"
+  bucket = google_storage_bucket.function_source.name
+  source = data.archive_file.function_source.output_path
+}
+
+# IAM binding to allow GitHub OIDC tokens to invoke Cloud Function
+# This allows any repository to invoke the Cloud Function
 # Authorization is handled by the function itself (checks if GitHub App is installed)
-resource "google_cloud_run_v2_service_iam_member" "github_oidc_invoker" {
-  name     = google_cloud_run_v2_service.github_token_issuer.name
-  location = google_cloud_run_v2_service.github_token_issuer.location
-  role     = "roles/run.invoker"
-  member   = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github_actions.workload_identity_pool_id}/*"
+resource "google_cloudfunctions2_function_iam_member" "github_oidc_invoker" {
+  project        = var.project_id
+  location       = google_cloudfunctions2_function.github_token_issuer.location
+  cloud_function = google_cloudfunctions2_function.github_token_issuer.name
+  role           = "roles/cloudfunctions.invoker"
+  member         = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github_actions.workload_identity_pool_id}/*"
 }
 
 # Workload Identity Pool for GitHub Actions
