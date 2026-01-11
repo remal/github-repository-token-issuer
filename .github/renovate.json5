@@ -12,7 +12,9 @@
   // $$$sync-with-template-modifiable: local $$$
   packageRules: [
     {
-      matchPackageNames: "**",
+      matchManagers: [
+        "terraform"
+      ],
       rangeStrategy: "pin"
     },
   ],
