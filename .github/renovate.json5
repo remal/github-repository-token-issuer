@@ -39,5 +39,10 @@
       rangeStrategy: "pin"
     },
   ],
+
+  postUpdateOptions: [
+    "gomodTidy",
+    "gomodUpdateImportPaths",
+  ],
   // $$$sync-with-template-modifiable-end$$$
 }
