@@ -13,6 +13,15 @@
   packageRules: [
     {
       matchManagers: [
+        "gomod"
+      ],
+      matchDepTypes: [
+        "indirect"
+      ],
+      enabled: true
+    },
+    {
+      matchManagers: [
         "terraform"
       ],
       matchDepTypes: [
