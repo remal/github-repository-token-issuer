@@ -67,8 +67,10 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 
 		// Validate permission value
 		if permission != "read" && permission != "write" {
-			writeError(w, http.StatusBadRequest,
-				fmt.Sprintf("invalid permission '%s' for scope '%s' (must be 'read' or 'write')", permission, param), nil)
+			writeError(w,
+				http.StatusBadRequest,
+				fmt.Sprintf("invalid permission '%s' for scope '%s' (must be 'read' or 'write')", permission, param),
+				nil)
 			return
 		}
 
