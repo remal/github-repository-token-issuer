@@ -87,7 +87,7 @@ jobs:
     steps:
     - name: Get GitHub Token
       id: get-token
-      uses: your-org/github-token-issuer@main
+      uses: your-org/github-repository-token-issuer@main
       with:
         scopes: |
           contents:write
@@ -113,12 +113,12 @@ jobs:
 ```bash
 # Obtain OIDC token from GitHub Actions
 OIDC_TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://github-token-issuer-xyz.run.app" | jq -r .value)
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://github-repository-token-issuer-xyz.run.app" | jq -r .value)
 
 # Call the function with repository permission scopes
 curl -X POST \
   -H "Authorization: Bearer ${OIDC_TOKEN}" \
-  "https://github-token-issuer-xyz.run.app/token?contents=write&deployments=write&statuses=write"
+  "https://github-repository-token-issuer-xyz.run.app/token?contents=write&deployments=write&statuses=write"
 ```
 
 ### Allowed Repository Permission Scopes

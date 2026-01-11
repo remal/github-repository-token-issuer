@@ -393,7 +393,7 @@ AllowedScopes = map[string][]string{
 **Single Endpoint**:
 
 ```
-POST https://github-token-issuer-[hash]-[region].a.run.app/token
+POST https://github-repository-token-issuer-[hash]-[region].a.run.app/token
 ```
 
 ### Query Parameters
@@ -436,7 +436,7 @@ The GitHub OIDC token serves as both the GCP IAM authentication token and the so
 ```bash
 curl -X POST \
   -H "Authorization: Bearer ${GITHUB_OIDC_TOKEN}" \
-  "https://github-token-issuer-xyz.run.app/token?issues=write&pull_requests=read"
+  "https://github-repository-token-issuer-xyz.run.app/token?issues=write&pull_requests=read"
 ```
 
 ### Response Format
@@ -607,25 +607,29 @@ When parsing query parameters:
 All infrastructure defined in `terraform/main.tf`:
 
 1. **Cloud Run Service**
-  - Name: `github-token-issuer`
-  - Region: User-configurable (e.g., `us-central1`)
-  - Container: Built from `function/Dockerfile`
-  - Environment variables: `GITHUB_APP_ID`
+
+- Name: `github-repository-token-issuer`
+- Region: User-configurable (e.g., `us-central1`)
+- Container: Built from `function/Dockerfile`
+- Environment variables: `GITHUB_APP_ID`
 
 2. **Secret Manager Secret**
-  - Name: `github-app-private-key`
-  - Contains: GitHub App private key in PEM format
-  - Access: Cloud Run service account has `secretmanager.secretAccessor` role
+
+- Name: `github-app-private-key`
+- Contains: GitHub App private key in PEM format
+- Access: Cloud Run service account has `secretmanager.secretAccessor` role
 
 3. **Service Account**
-  - Name: `github-token-issuer-sa`
-  - Purpose: Cloud Run service identity
-  - Permissions: Secret Manager access
+
+- Name: `github-repository-token-issuer-sa`
+- Purpose: Cloud Run service identity
+- Permissions: Secret Manager access
 
 4. **IAM Bindings**
-  - GitHub OIDC federation to invoke Cloud Run
-  - Configured to accept tokens with specific `aud` claim
-  - Maps GitHub repository claims to Cloud Run invoke permissions
+
+- GitHub OIDC federation to invoke Cloud Run
+- Configured to accept tokens with specific `aud` claim
+- Maps GitHub repository claims to Cloud Run invoke permissions
 
 ### Terraform State Management
 
@@ -635,7 +639,7 @@ All infrastructure defined in `terraform/main.tf`:
   terraform {
     backend "gcs" {
       bucket = "your-terraform-state-bucket"
-      prefix = "github-token-issuer"
+      prefix = "github-repository-token-issuer"
     }
   }
   ```
@@ -706,13 +710,13 @@ curl -X POST \
 cd function
 
 # Build image
-docker build -t github-token-issuer .
+docker build -t github-repository-token-issuer .
 
 # Run container
 docker run -p 8080:8080 \
   -e GITHUB_APP_ID="${GITHUB_APP_ID}" \
   -e GOOGLE_CLOUD_PROJECT="${GOOGLE_CLOUD_PROJECT}" \
-  github-token-issuer
+  github-repository-token-issuer
 ```
 
 ### Linting
@@ -740,12 +744,13 @@ golangci-lint run
 ### Initial Setup
 
 1. **Create GitHub App**:
-  - Navigate to GitHub Settings → Developer settings → GitHub Apps
-  - Configure **Repository permissions** only
-  - Do **not** configure Organization permissions or Account permissions
-  - Generate private key (download PEM file)
-  - Note the App ID
-  - Install the app on the repositories where you want to use it
+
+- Navigate to GitHub Settings → Developer settings → GitHub Apps
+- Configure **Repository permissions** only
+- Do **not** configure Organization permissions or Account permissions
+- Generate private key (download PEM file)
+- Note the App ID
+- Install the app on the repositories where you want to use it
 
 2. **Configure GCP**:
    ```bash
@@ -815,11 +820,11 @@ terraform apply
 
 ```bash
 # Build and push
-gcloud builds submit function/ --tag gcr.io/PROJECT_ID/github-token-issuer
+gcloud builds submit function/ --tag gcr.io/PROJECT_ID/github-repository-token-issuer
 
 # Deploy
-gcloud run deploy github-token-issuer \
-  --image gcr.io/PROJECT_ID/github-token-issuer \
+gcloud run deploy github-repository-token-issuer \
+  --image gcr.io/PROJECT_ID/github-repository-token-issuer \
   --region us-central1 \
   --set-env-vars GITHUB_APP_ID=123456 \
   --no-allow-unauthenticated
@@ -854,9 +859,10 @@ gcloud run deploy github-token-issuer \
    ```
 
 3. **Test the change**:
-  - Deploy to test environment
-  - Call function with new scope
-  - Verify token is issued correctly
+
+- Deploy to test environment
+- Call function with new scope
+- Verify token is issued correctly
 
 4. **Deploy to production** via CI/CD
 
@@ -884,7 +890,7 @@ This will cause validation to reject `?my_scope=write` with 400 error.
 
 ```bash
 gcloud secrets add-iam-policy-binding github-app-private-key \
-  --member="serviceAccount:github-token-issuer-sa@PROJECT_ID.iam.gserviceaccount.com" \
+  --member="serviceAccount:github-repository-token-issuer-sa@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 ```
 
@@ -983,18 +989,23 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 ### Possible Enhancements (Not Planned)
 
 1. **Token caching**: Cache tokens per repo+scopes to reduce GitHub API calls
-  - Tradeoff: Added complexity, Redis/Memorystore cost
+
+- Tradeoff: Added complexity, Redis/Memorystore cost
 
 2. **Metrics and monitoring**: Export metrics for observability
-  - Tradeoff: More code, potential log costs
+
+- Tradeoff: More code, potential log costs
 
 3. **Request deduplication**: Reuse tokens for concurrent requests
-  - Tradeoff: Distributed locking complexity
+
+- Tradeoff: Distributed locking complexity
 
 4. **Support for organization permissions**: Expand beyond repository permissions
-  - Tradeoff: Significantly more complex permission model
+
+- Tradeoff: Significantly more complex permission model
 
 5. **Custom token expiration**: Let caller specify expiry up to 1 hour
-  - Tradeoff: More validation logic, potential security risk
+
+- Tradeoff: More validation logic, potential security risk
 
 **Philosophy**: Keep it simple. Only add features if they're clearly needed.
