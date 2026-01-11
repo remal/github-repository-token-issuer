@@ -1,4 +1,4 @@
-# GitHub Token Issuer App
+# GitHub Repository Token Issuer App
 
 A secure, serverless GitHub App hosted on Google Cloud Platform that issues short-lived, scoped GitHub installation tokens to GitHub Actions workflows.
 
@@ -6,16 +6,9 @@ A secure, serverless GitHub App hosted on Google Cloud Platform that issues shor
 
 - [Overview](#overview)
 - [Usage](#usage)
-- [Architecture](#architecture)
-- [Technical Specifications](#technical-specifications)
-- [API Design](#api-design)
-- [Authentication & Security](#authentication--security)
-- [Scope Management](#scope-management)
-- [Token Management](#token-management)
-- [Error Handling](#error-handling)
-- [Infrastructure](#infrastructure)
-- [Deployment](#deployment)
 - [Repository Structure](#repository-structure)
+- [Contributing](#contributing)
+- [Support](#support)
 
 ## Overview
 
@@ -191,6 +184,8 @@ The following repository permission scopes are allowed (use the Scope ID in your
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml         # CI/CD deployment workflow
+├── AGENT.md                   # AI agent development guidelines
+├── CLAUDE.md                  # Claude development entry point
 ├── DEVELOPMENT.md             # Technical implementation details
 └── README.md                  # This file
 
@@ -201,6 +196,8 @@ The following repository permission scopes are allowed (use the Scope ID in your
 This is a single-purpose utility. Contributions should maintain simplicity and avoid feature creep.
 
 For technical implementation details, architecture decisions, and development setup, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+For AI-assisted development guidelines, see [CLAUDE.md](CLAUDE.md) and [AGENT.md](AGENT.md).
 
 ## Support
 

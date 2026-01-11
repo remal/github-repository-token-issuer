@@ -1,6 +1,6 @@
 # Development Documentation
 
-Technical implementation details and architecture documentation for the GitHub Token Issuer App.
+Technical implementation details and architecture documentation for the GitHub Repository Token Issuer App.
 
 ## Table of Contents
 
@@ -135,12 +135,14 @@ terraform/             # Infrastructure as Code
 ### Key Files
 
 #### `function/main.go`
+
 - HTTP server setup (port 8080)
 - Routes POST /token to handler
 - Startup validation (GITHUB_APP_ID env var)
 - Graceful shutdown handling
 
 #### `function/handlers.go`
+
 - `TokenHandler()`: Main request handler
 - Query parameter parsing (scope name → permission level)
 - OIDC token extraction from Authorization header
@@ -148,17 +150,20 @@ terraform/             # Infrastructure as Code
 - Error response handling (400, 401, 403, 500, 503)
 
 #### `function/validation.go`
+
 - `ValidateScopes()`: Check for duplicates, allowlist/blacklist
 - `ExtractRepositoryFromOIDC()`: Parse repository claim
 - `ValidateScopePermissions()`: Verify read/write are valid
 - Duplicate detection logic
 
 #### `function/scopes.go`
+
 - `AllowedScopes`: Map of scope ID → allowed levels (read, write, or both)
 - `BlacklistedScopes`: Set of forbidden scopes
 - Read-only restrictions for security scopes (code_scanning, dependabot_alerts, etc.)
 
 #### `function/github.go`
+
 - `NewGitHubClient()`: Initialize go-github SDK client
 - `GetPrivateKey()`: Fetch from Secret Manager
 - `CreateJWT()`: Sign JWT with private key (RS256)
@@ -180,6 +185,7 @@ repository := extractClaimFromJWT(token, "repository")
 ```
 
 **No additional signature verification needed** - GCP IAM already verified:
+
 - Token signature is valid
 - Issuer is `https://token.actions.githubusercontent.com`
 - Audience matches Cloud Run service URL
@@ -243,6 +249,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 ```
 
 **GitHub returns**:
+
 - Token string (ghs_...)
 - Expiration timestamp (1 hour from creation)
 - Actually granted permissions
@@ -253,18 +260,19 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 **Fail Fast Philosophy**: Return errors immediately without retries.
 
-| Error | Status | When | Action |
-|-------|--------|------|--------|
-| Duplicate scope | 400 | Same scope appears multiple times | Reject request |
-| Invalid scope | 400 | Scope not in allowlist | Reject request |
-| Blacklisted scope | 400 | Scope in blacklist | Reject request |
-| Invalid OIDC | 401 | GCP IAM rejection | Should never reach function |
-| App not installed | 403 | GitHub App not on repo | Reject request |
-| Insufficient permissions | 403 | App lacks permission | Reject request |
-| Secret Manager error | 500 | Can't fetch private key | Reject request |
-| GitHub API error | 503 | GitHub unavailable | Reject request |
+| Error                    | Status | When                              | Action                      |
+|--------------------------|--------|-----------------------------------|-----------------------------|
+| Duplicate scope          | 400    | Same scope appears multiple times | Reject request              |
+| Invalid scope            | 400    | Scope not in allowlist            | Reject request              |
+| Blacklisted scope        | 400    | Scope in blacklist                | Reject request              |
+| Invalid OIDC             | 401    | GCP IAM rejection                 | Should never reach function |
+| App not installed        | 403    | GitHub App not on repo            | Reject request              |
+| Insufficient permissions | 403    | App lacks permission              | Reject request              |
+| Secret Manager error     | 500    | Can't fetch private key           | Reject request              |
+| GitHub API error         | 503    | GitHub unavailable                | Reject request              |
 
 **No retries because**:
+
 - Keeps code simple
 - Errors are usually fatal (wrong config, not transient)
 - GitHub Actions has built-in retry logic
@@ -275,16 +283,19 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 ### Private Key Security
 
 **Storage**: GitHub App private key stored in GCP Secret Manager
+
 - Encrypted at rest
 - Access controlled via IAM
 - Audit logs for all access
 
 **Usage**:
+
 - Fetched on every request (no in-memory caching)
 - Never logged or exposed in responses
 - Used only to sign JWTs
 
 **Rotation**:
+
 1. Generate new key on GitHub
 2. Update Secret Manager secret
 3. Deploy new function version
@@ -294,12 +305,14 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 ### Read-Only Security Scopes
 
 These scopes are intentionally restricted to read-only to prevent security risks:
+
 - `code_scanning` - Prevents tampering with security alerts
 - `dependabot_alerts` - Prevents hiding vulnerabilities
 - `security_advisories` - Prevents modifying security disclosures
 - `secret_scanning` - Prevents hiding leaked secrets
 
 **Implementation**: Hardcoded in `function/scopes.go`:
+
 ```go
 AllowedScopes = map[string][]string{
     "code_scanning":       {"read"},
@@ -313,6 +326,7 @@ AllowedScopes = map[string][]string{
 ### OIDC Token Validation
 
 **GCP IAM validates**:
+
 - Signature validity (RS256)
 - Issuer is GitHub Actions
 - Audience matches Cloud Run URL
@@ -320,18 +334,21 @@ AllowedScopes = map[string][]string{
 - Token wasn't revoked
 
 **Function validates**:
+
 - Repository claim exists
 - Repository format is valid (owner/repo)
 
 ### No Logging of Sensitive Data
 
 **Never log**:
+
 - OIDC token contents
 - GitHub App private key
 - Installation access tokens
 - JWT tokens
 
 **OK to log**:
+
 - Repository name (from claim)
 - Requested scopes
 - Error types
@@ -341,7 +358,7 @@ AllowedScopes = map[string][]string{
 
 ### Runtime Environment
 
-- **Language**: Go 1.23+ (latest stable)
+- **Language**: Go 1.25+
 - **Platform**: Google Cloud Run (2nd generation)
 - **Scaling**:
   - Minimum instances: 0 (cost optimization)
@@ -357,7 +374,7 @@ AllowedScopes = map[string][]string{
 ### Build & Deployment
 
 - **Containerization**: Multi-stage Dockerfile (`function/Dockerfile`)
-  - Build stage: golang:1.23 with full SDK
+  - Build stage: golang:1.25+ with full SDK
   - Runtime stage: distroless or scratch for minimal image size
 - **CI/CD**: GitHub Actions workflow (.github/workflows/deploy.yml)
   - Triggered on push to main branch
@@ -584,25 +601,25 @@ When parsing query parameters:
 All infrastructure defined in `terraform/main.tf`:
 
 1. **Cloud Run Service**
-   - Name: `github-token-issuer`
-   - Region: User-configurable (e.g., `us-central1`)
-   - Container: Built from `function/Dockerfile`
-   - Environment variables: `GITHUB_APP_ID`
+  - Name: `github-token-issuer`
+  - Region: User-configurable (e.g., `us-central1`)
+  - Container: Built from `function/Dockerfile`
+  - Environment variables: `GITHUB_APP_ID`
 
 2. **Secret Manager Secret**
-   - Name: `github-app-private-key`
-   - Contains: GitHub App private key in PEM format
-   - Access: Cloud Run service account has `secretmanager.secretAccessor` role
+  - Name: `github-app-private-key`
+  - Contains: GitHub App private key in PEM format
+  - Access: Cloud Run service account has `secretmanager.secretAccessor` role
 
 3. **Service Account**
-   - Name: `github-token-issuer-sa`
-   - Purpose: Cloud Run service identity
-   - Permissions: Secret Manager access
+  - Name: `github-token-issuer-sa`
+  - Purpose: Cloud Run service identity
+  - Permissions: Secret Manager access
 
 4. **IAM Bindings**
-   - GitHub OIDC federation to invoke Cloud Run
-   - Configured to accept tokens with specific `aud` claim
-   - Maps GitHub repository claims to Cloud Run invoke permissions
+  - GitHub OIDC federation to invoke Cloud Run
+  - Configured to accept tokens with specific `aud` claim
+  - Maps GitHub repository claims to Cloud Run invoke permissions
 
 ### Terraform State Management
 
@@ -636,7 +653,7 @@ No validation of Secret Manager connectivity or private key format at startup; f
 
 ### Prerequisites
 
-- Go 1.23+
+- Go 1.25+
 - Docker (for container builds)
 - gcloud CLI (for Secret Manager access)
 - GitHub App for testing
@@ -717,12 +734,12 @@ golangci-lint run
 ### Initial Setup
 
 1. **Create GitHub App**:
-   - Navigate to GitHub Settings → Developer settings → GitHub Apps
-   - Configure **Repository permissions** only
-   - Do **not** configure Organization permissions or Account permissions
-   - Generate private key (download PEM file)
-   - Note the App ID
-   - Install the app on the repositories where you want to use it
+  - Navigate to GitHub Settings → Developer settings → GitHub Apps
+  - Configure **Repository permissions** only
+  - Do **not** configure Organization permissions or Account permissions
+  - Generate private key (download PEM file)
+  - Note the App ID
+  - Install the app on the repositories where you want to use it
 
 2. **Configure GCP**:
    ```bash
@@ -781,6 +798,7 @@ terraform apply
 ### Cloud Run Deployment
 
 **Terraform handles**:
+
 1. Building container from `function/Dockerfile`
 2. Pushing to Artifact Registry
 3. Deploying to Cloud Run
@@ -788,6 +806,7 @@ terraform apply
 5. Setting up IAM bindings for OIDC
 
 **Manual deployment** (if needed):
+
 ```bash
 # Build and push
 gcloud builds submit function/ --tag gcr.io/PROJECT_ID/github-token-issuer
@@ -829,9 +848,9 @@ gcloud run deploy github-token-issuer \
    ```
 
 3. **Test the change**:
-   - Deploy to test environment
-   - Call function with new scope
-   - Verify token is issued correctly
+  - Deploy to test environment
+  - Call function with new scope
+  - Verify token is issued correctly
 
 4. **Deploy to production** via CI/CD
 
@@ -856,6 +875,7 @@ This will cause validation to reject `?my_scope=write` with 400 error.
 **Cause**: Cloud Run service account lacks permission to read secret
 
 **Fix**:
+
 ```bash
 gcloud secrets add-iam-policy-binding github-app-private-key \
   --member="serviceAccount:github-token-issuer-sa@PROJECT_ID.iam.gserviceaccount.com" \
@@ -883,6 +903,7 @@ gcloud secrets add-iam-policy-binding github-app-private-key \
 ### Debugging Tips
 
 **Check Cloud Run logs**:
+
 ```bash
 gcloud logs read --project=PROJECT_ID \
   --resource-type=cloud_run_revision \
@@ -890,11 +911,13 @@ gcloud logs read --project=PROJECT_ID \
 ```
 
 **Verify Secret Manager access**:
+
 ```bash
 gcloud secrets versions access latest --secret=github-app-private-key
 ```
 
 **Test GitHub App JWT creation**:
+
 ```bash
 # Create JWT manually and test with GitHub API
 curl -H "Authorization: Bearer $(cat jwt.txt)" \
@@ -902,6 +925,7 @@ curl -H "Authorization: Bearer $(cat jwt.txt)" \
 ```
 
 **Validate OIDC token locally**:
+
 ```bash
 # Decode token (don't verify signature)
 echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
@@ -914,6 +938,7 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 **Expected latency**: 500ms - 2s per request
 
 **Breakdown**:
+
 - Secret Manager fetch: 100-300ms
 - GitHub API calls (2-3): 200-800ms
 - JWT creation: <10ms
@@ -924,6 +949,7 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 ### Scaling
 
 **Auto-scaling configuration**:
+
 - Min instances: 0 (cost optimization)
 - Max instances: 10 (low volume expected)
 - Concurrency: 80 requests per instance
@@ -933,6 +959,7 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 ### Cost Optimization
 
 **Low cost design**:
+
 - No database
 - No caching layer
 - Minimal compute (short request duration)
@@ -940,6 +967,7 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 - Secret Manager reads are inexpensive
 
 **Estimated cost** (for <100 requests/day):
+
 - Cloud Run: <$1/month
 - Secret Manager: <$0.10/month
 - Total: <$2/month
@@ -949,18 +977,18 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 ### Possible Enhancements (Not Planned)
 
 1. **Token caching**: Cache tokens per repo+scopes to reduce GitHub API calls
-   - Tradeoff: Added complexity, Redis/Memorystore cost
+  - Tradeoff: Added complexity, Redis/Memorystore cost
 
 2. **Metrics and monitoring**: Export metrics for observability
-   - Tradeoff: More code, potential log costs
+  - Tradeoff: More code, potential log costs
 
 3. **Request deduplication**: Reuse tokens for concurrent requests
-   - Tradeoff: Distributed locking complexity
+  - Tradeoff: Distributed locking complexity
 
 4. **Support for organization permissions**: Expand beyond repository permissions
-   - Tradeoff: Significantly more complex permission model
+  - Tradeoff: Significantly more complex permission model
 
 5. **Custom token expiration**: Let caller specify expiry up to 1 hour
-   - Tradeoff: More validation logic, potential security risk
+  - Tradeoff: More validation logic, potential security risk
 
 **Philosophy**: Keep it simple. Only add features if they're clearly needed.
