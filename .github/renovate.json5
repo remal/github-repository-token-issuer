@@ -12,6 +12,7 @@
   // $$$sync-with-template-modifiable: local $$$
   packageRules: [
     {
+      matchPackageNames: "**",
       rangeStrategy: "pin"
     },
   ],
