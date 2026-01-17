@@ -7,18 +7,23 @@ import (
 	"testing"
 )
 
-// Helper function to create a test JWT with custom claims
+// createTestJWT creates a structurally valid JWT with custom claims for testing.
 func createTestJWT(claims map[string]interface{}) string {
 	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"JWT"}`))
-
 	claimsJSON, _ := json.Marshal(claims)
 	payload := base64.RawURLEncoding.EncodeToString(claimsJSON)
-
 	signature := base64.RawURLEncoding.EncodeToString([]byte("fake-signature"))
-
 	return header + "." + payload + "." + signature
 }
 
+// TestExtractRepositoryFromOIDC tests the extraction of repository claims from GitHub OIDC tokens.
+// It verifies that the function correctly parses valid tokens and rejects invalid ones.
+//
+// Test steps:
+//  1. Create test JWT with specific claims (valid or invalid)
+//  2. Call ExtractRepositoryFromOIDC with the test token
+//  3. Verify the returned repository matches expected value (for valid tokens)
+//  4. Verify the error message contains expected text (for invalid tokens)
 func TestExtractRepositoryFromOIDC(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -133,24 +138,30 @@ func TestExtractRepositoryFromOIDC(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Step 2: Call the function under test
 			got, err := ExtractRepositoryFromOIDC(tt.token)
 
+			// Step 3 & 4: Verify results
 			if tt.wantErr {
+				// Verify error is returned
 				if err == nil {
 					t.Errorf("ExtractRepositoryFromOIDC() error = nil, wantErr = true")
 					return
 				}
+				// Verify error message contains expected text
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("ExtractRepositoryFromOIDC() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
 			}
 
+			// Verify no error for valid tokens
 			if err != nil {
 				t.Errorf("ExtractRepositoryFromOIDC() unexpected error = %v", err)
 				return
 			}
 
+			// Verify returned repository matches expected
 			if got != tt.wantRepo {
 				t.Errorf("ExtractRepositoryFromOIDC() = %v, want %v", got, tt.wantRepo)
 			}
@@ -158,6 +169,14 @@ func TestExtractRepositoryFromOIDC(t *testing.T) {
 	}
 }
 
+// TestValidateScopes tests the scope validation logic against allowlist and blacklist.
+// It verifies that valid scopes pass validation and invalid scopes are rejected with appropriate errors.
+//
+// Test steps:
+//  1. Create a map of scopes with permission levels
+//  2. Call ValidateScopes with the test scopes
+//  3. Verify no error is returned for valid scopes
+//  4. Verify appropriate error is returned for invalid scopes
 func TestValidateScopes(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -287,19 +306,24 @@ func TestValidateScopes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Step 2: Call the function under test
 			err := ValidateScopes(tt.scopes)
 
+			// Step 3 & 4: Verify results
 			if tt.wantErr {
+				// Verify error is returned
 				if err == nil {
 					t.Errorf("ValidateScopes() error = nil, wantErr = true")
 					return
 				}
+				// Verify error message contains expected text
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("ValidateScopes() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
 			}
 
+			// Verify no error for valid scopes
 			if err != nil {
 				t.Errorf("ValidateScopes() unexpected error = %v", err)
 			}

@@ -11,7 +11,7 @@ import (
 	"github.com/google/go-github/v81/github"
 )
 
-// generateTestRSAKey creates an RSA key pair for testing
+// generateTestRSAKey creates a 2048-bit RSA key pair for testing JWT signing.
 func generateTestRSAKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()
 	key, err := rsa.GenerateKey(rand.Reader, 2048)
@@ -21,6 +21,14 @@ func generateTestRSAKey(t *testing.T) *rsa.PrivateKey {
 	return key
 }
 
+// TestCreateJWT tests JWT creation for GitHub App authentication.
+// It verifies that valid keys produce valid JWTs and nil keys return errors.
+//
+// Test steps:
+//  1. Generate a test RSA key (or use nil for error cases)
+//  2. Call CreateJWT with the key and app ID
+//  3. Verify JWT is returned for valid keys (non-empty, 3-part structure)
+//  4. Verify error is returned for nil keys
 func TestCreateJWT(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -56,40 +64,47 @@ func TestCreateJWT(t *testing.T) {
 		},
 	}
 
-	// Generate a shared test key for valid cases
+	// Step 1: Generate a shared test key for valid cases
 	validKey := generateTestRSAKey(t)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Determine which key to use
 			var key *rsa.PrivateKey
 			if !tt.useNilKey {
 				key = validKey
 			}
 
+			// Step 2: Call CreateJWT
 			got, err := CreateJWT(key, tt.appID)
 
+			// Step 3 & 4: Verify results
 			if tt.wantErr {
+				// Verify error is returned
 				if err == nil {
 					t.Errorf("CreateJWT() error = nil, wantErr = true")
 					return
 				}
+				// Verify error message contains expected text
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("CreateJWT() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
 			}
 
+			// Verify no error for valid keys
 			if err != nil {
 				t.Errorf("CreateJWT() unexpected error = %v", err)
 				return
 			}
 
+			// Verify JWT is not empty
 			if got == "" {
 				t.Error("CreateJWT() returned empty string")
 				return
 			}
 
-			// Verify JWT structure (3 parts)
+			// Verify JWT structure (3 parts separated by dots)
 			parts := strings.Split(got, ".")
 			if len(parts) != 3 {
 				t.Errorf("CreateJWT() returned invalid JWT format, got %d parts, want 3", len(parts))
@@ -98,11 +113,25 @@ func TestCreateJWT(t *testing.T) {
 	}
 }
 
+// TestCreateJWT_Claims tests that JWT claims are correctly set.
+// It verifies iat (issued at), exp (expiration), and iss (issuer) claims.
+//
+// Test steps:
+//  1. Generate a test RSA key
+//  2. Record timestamp before/after JWT creation
+//  3. Call CreateJWT to generate a token
+//  4. Parse the JWT and extract claims
+//  5. Verify iss claim matches app ID
+//  6. Verify iat claim is within expected time range
+//  7. Verify exp claim is exactly 10 minutes after iat
 func TestCreateJWT_Claims(t *testing.T) {
+	// Step 1: Generate test key
 	key := generateTestRSAKey(t)
 	appID := "12345"
 
+	// Step 2: Record timestamps
 	beforeCreate := time.Now().Unix()
+	// Step 3: Create JWT
 	tokenString, err := CreateJWT(key, appID)
 	afterCreate := time.Now().Unix()
 
@@ -110,7 +139,7 @@ func TestCreateJWT_Claims(t *testing.T) {
 		t.Fatalf("CreateJWT() error = %v", err)
 	}
 
-	// Parse the token to verify claims
+	// Step 4: Parse the token to verify claims
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return &key.PublicKey, nil
 	})
@@ -124,12 +153,12 @@ func TestCreateJWT_Claims(t *testing.T) {
 		t.Fatal("failed to get claims from token")
 	}
 
-	// Verify issuer claim
+	// Step 5: Verify issuer claim
 	if iss, ok := claims["iss"].(string); !ok || iss != appID {
 		t.Errorf("JWT iss claim = %v, want %v", claims["iss"], appID)
 	}
 
-	// Verify iat claim (issued at)
+	// Step 6: Verify iat claim (issued at)
 	if iat, ok := claims["iat"].(float64); !ok {
 		t.Error("JWT iat claim missing or invalid type")
 	} else {
@@ -139,7 +168,7 @@ func TestCreateJWT_Claims(t *testing.T) {
 		}
 	}
 
-	// Verify exp claim (expiration - should be ~10 minutes from iat)
+	// Step 7: Verify exp claim (expiration - should be ~10 minutes from iat)
 	if exp, ok := claims["exp"].(float64); !ok {
 		t.Error("JWT exp claim missing or invalid type")
 	} else {
@@ -153,26 +182,46 @@ func TestCreateJWT_Claims(t *testing.T) {
 	}
 }
 
+// TestCreateJWT_Algorithm tests that the JWT uses RS256 signing algorithm.
+// GitHub requires RS256 for App authentication.
+//
+// Test steps:
+//  1. Generate a test RSA key
+//  2. Call CreateJWT to generate a token
+//  3. Parse the JWT header without verification
+//  4. Verify the algorithm is RS256
 func TestCreateJWT_Algorithm(t *testing.T) {
+	// Step 1: Generate test key
 	key := generateTestRSAKey(t)
 	appID := "12345"
 
+	// Step 2: Create JWT
 	tokenString, err := CreateJWT(key, appID)
 	if err != nil {
 		t.Fatalf("CreateJWT() error = %v", err)
 	}
 
-	// Parse without verification to check header
+	// Step 3: Parse without verification to check header
 	token, _, err := jwt.NewParser().ParseUnverified(tokenString, jwt.MapClaims{})
 	if err != nil {
 		t.Fatalf("failed to parse JWT: %v", err)
 	}
 
+	// Step 4: Verify RS256 algorithm
 	if token.Method.Alg() != "RS256" {
 		t.Errorf("JWT algorithm = %v, want RS256", token.Method.Alg())
 	}
 }
 
+// TestVerifyRequestedScopes tests verification of requested vs granted scopes.
+// It ensures the function correctly identifies missing or mismatched permissions.
+//
+// Test steps:
+//  1. Create a map of requested scopes with permission levels
+//  2. Create a mock InstallationPermissions struct with granted scopes
+//  3. Call VerifyRequestedScopes with requested and granted
+//  4. Verify no error when all scopes match
+//  5. Verify error when scopes are missing or have wrong permission level
 func TestVerifyRequestedScopes(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -405,19 +454,24 @@ func TestVerifyRequestedScopes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			// Step 3: Call VerifyRequestedScopes
 			err := VerifyRequestedScopes(tt.requested, tt.granted)
 
+			// Step 4 & 5: Verify results
 			if tt.wantErr {
+				// Verify error is returned
 				if err == nil {
 					t.Errorf("VerifyRequestedScopes() error = nil, wantErr = true")
 					return
 				}
+				// Verify error message contains expected text
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
 					t.Errorf("VerifyRequestedScopes() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
 			}
 
+			// Verify no error when scopes match
 			if err != nil {
 				t.Errorf("VerifyRequestedScopes() unexpected error = %v", err)
 			}
@@ -425,10 +479,18 @@ func TestVerifyRequestedScopes(t *testing.T) {
 	}
 }
 
+// TestNewGitHubClientWithJWT tests GitHub client creation with JWT authentication.
+// It verifies the function returns a non-nil client.
+//
+// Test steps:
+//  1. Call NewGitHubClientWithJWT with a test token
+//  2. Verify the returned client is not nil
 func TestNewGitHubClientWithJWT(t *testing.T) {
+	// Step 1: Create client with test token
 	token := "test-jwt-token"
 	client := NewGitHubClientWithJWT(token)
 
+	// Step 2: Verify client is not nil
 	if client == nil {
 		t.Error("NewGitHubClientWithJWT() returned nil")
 	}
