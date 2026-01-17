@@ -8,12 +8,22 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: build-${{github.ref}}
   cancel-in-progress: true
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: Debug OIDC Claims
+      uses: steve-todorov/oidc-debugger-action@v1
+      with:
+        audience: '${{ github.server_url }}/${{ github.repository }}'
+
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 10
