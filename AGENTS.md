@@ -43,7 +43,7 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 function/     # All Go code
 terraform/    # All infrastructure code
 action.yml    # Composite action in root
-.github/workflows/deploy.yml  # CI/CD
+.github/workflows/build.yml  # CI/CD
 ```
 
 **Never** create files in repository root except:
@@ -57,7 +57,6 @@ action.yml    # Composite action in root
 - **README.md**: User-facing only (overview, usage, error codes, repo structure)
 - **DEVELOPMENT.md**: Technical details (architecture, implementation, local dev, deployment)
 - **AGENTS.md**: AI agent development guidelines (this file)
-- **CLAUDE.md**: Main entry point that includes AGENTS.md
 - Keep Table of Contents updated in README.md and DEVELOPMENT.md
 - No emojis unless explicitly requested
 - Use GitHub-flavored markdown
@@ -247,14 +246,14 @@ Authorization: Bearer <GITHUB_OIDC_TOKEN>
 // Parse query parameters
 scopes := make(map[string]string)
 for param, values := range r.URL.Query() {
-    if len(values) > 1 {
-        return fmt.Errorf("duplicate scope '%s' in request", param)
-    }
-    permission := values[0]
-    if permission != "read" && permission != "write" {
-        return fmt.Errorf("invalid permission '%s' for scope '%s'", permission, param)
-    }
-    scopes[param] = permission
+if len(values) > 1 {
+return fmt.Errorf("duplicate scope '%s' in request", param)
+}
+permission := values[0]
+if permission != "read" && permission != "write" {
+return fmt.Errorf("invalid permission '%s' for scope '%s'", permission, param)
+}
+scopes[param] = permission
 }
 ```
 
