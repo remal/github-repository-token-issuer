@@ -64,6 +64,10 @@ func GetPrivateKey(ctx context.Context, projectID string) (privateKey *rsa.Priva
 // CreateJWT creates a JWT for authenticating as the GitHub App.
 // JWT expires in 10 minutes (GitHub's maximum allowed).
 func CreateJWT(privateKey *rsa.PrivateKey, appID string) (string, error) {
+	if privateKey == nil {
+		return "", fmt.Errorf("private key is nil")
+	}
+
 	now := time.Now()
 
 	claims := jwt.MapClaims{

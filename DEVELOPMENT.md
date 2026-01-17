@@ -9,6 +9,8 @@ Technical implementation details and architecture documentation for the GitHub R
 - [Implementation Details](#implementation-details)
 - [Security Considerations](#security-considerations)
 - [Local Development](#local-development)
+  - [Linting](#linting)
+  - [Testing](#testing)
 - [Deployment](#deployment)
 - [Adding New Scopes](#adding-new-scopes)
 - [Troubleshooting](#troubleshooting)
@@ -716,15 +718,39 @@ curl -X POST \
 
 ### Linting
 
+Install [golangci-lint](https://golangci-lint.run/):
+
+```bash
+# macOS (recommended)
+brew install golangci-lint
+
+# Or via Go
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+```
+
+Run linter:
+
+```bash
+cd function
+golangci-lint run
+```
+
+### Testing
+
 ```bash
 cd function
 
-# Install golangci-lint
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+# Run all tests
+GITHUB_APP_ID=1 go test ./...
 
-# Run linter
-golangci-lint run
+# Run with verbose output
+GITHUB_APP_ID=1 go test -v ./...
+
+# Run specific test
+GITHUB_APP_ID=1 go test -v -run TestValidateScopes ./...
 ```
+
+Note: `GITHUB_APP_ID` env var is required because `init()` validates it at startup.
 
 ## Deployment
 

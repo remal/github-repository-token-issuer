@@ -33,6 +33,11 @@ jobs:
       uses: golangci/golangci-lint-action@v9
       with:
         working-directory: function
+    - name: Go - Test
+      working-directory: ./function
+      run: go test -v ./...
+      env:
+        GITHUB_APP_ID: "1"
 
     - name: Terraform - Read version
       id: terraform-version
