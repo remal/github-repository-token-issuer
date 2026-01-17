@@ -41,7 +41,7 @@ This app solves these problems by issuing short-lived GitHub App installation to
 - Scope allowlisting and blacklisting for security
 - Simple API with query parameter-based scope specification
 - Automated CI/CD pipeline using GitHub Actions and Terraform
-- Minimal operational overhead with no logging or monitoring complexity
+- Minimal operational overhead with conditional logging (only via tag URLs for debugging)
 
 > **For Developers**: See [DEVELOPMENT.md](DEVELOPMENT.md) for technical architecture, implementation details, and local development setup.
 

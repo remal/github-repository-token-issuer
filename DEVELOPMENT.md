@@ -32,7 +32,7 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 1. **Stateless** - No database or persistent storage, all validation happens per-request
 2. **Fail Fast** - Errors are returned immediately without retries to keep logic simple
 3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request to avoid stale data
-4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
+4. **Conditional Logging** - Logs are only emitted when service is invoked via Cloud Run tag URLs (for debugging canary deployments)
 
 ### Architecture Diagram
 
@@ -131,6 +131,7 @@ function/               # Go application code
 ├── github.go          # GitHub API client and JWT logic
 ├── validation.go      # Scope and OIDC validation
 ├── scopes.go          # Allowlist/blacklist definitions
+├── logging.go         # Conditional logging (tag URL only)
 └── go.mod             # Go module dependencies
 
 terraform/             # Infrastructure as Code
@@ -168,6 +169,15 @@ terraform/             # Infrastructure as Code
 - `AllowedScopes`: Map of scope ID → allowed levels (read, write, or both)
 - `BlacklistedScopes`: Set of forbidden scopes
 - Read-only restrictions for security scopes (secret_scanning)
+
+#### `function/logging.go`
+
+- `RequestLogger`: Conditional logger that only emits logs when invoked via tag URL
+- `NewRequestLogger()`: Creates logger, detects tag URLs by checking if Host contains `---`
+- `LogRequest()`: Logs incoming request with repository and scope names
+- `LogValidationError()`: Logs validation failures
+- `LogGitHubAPICall()`: Logs GitHub API call outcomes
+- `LogResponse()`: Logs final response with status, duration, and granted scopes
 
 #### `function/github.go`
 
@@ -340,21 +350,24 @@ AllowedScopes = map[string][]string{
 - Repository claim exists
 - Repository format is valid (owner/repo)
 
-### No Logging of Sensitive Data
+### Conditional Logging and Sensitive Data
 
-**Never log**:
+Logs are only emitted when the service is invoked via Cloud Run tag URLs (e.g., `https://canary---service-hash.a.run.app`). This design enables debugging during canary deployments without incurring logging costs in production.
+
+**Never logged** (regardless of invocation method):
 
 - OIDC token contents
 - GitHub App private key
 - Installation access tokens
 - JWT tokens
 
-**OK to log**:
+**Logged only via tag URLs**:
 
-- Repository name (from claim)
-- Requested scopes
-- Error types
-- Request timestamps
+- Repository name (from OIDC claim)
+- Requested scope names (not tokens)
+- Error types and details
+- Request timestamps and duration
+- GitHub API operation outcomes
 
 ## Technical Specifications
 
@@ -594,12 +607,25 @@ When parsing query parameters:
 
 **Logging Strategy**:
 
-**No Logging**:
+**Conditional Logging** (tag URLs only):
 
-- No logs for authentication failures
-- No debug logs for requests
-- No metrics or observability infrastructure
-- Keep implementation simple and cost-minimal
+Logs are emitted only when the service is invoked via a Cloud Run tag URL (e.g., `https://canary---service-hash.a.run.app`). This enables debugging during canary deployments without incurring logging costs in production.
+
+**Logged events** (only via tag URLs):
+
+- `request_received`: Repository, requested scope names
+- `validation_failed`: Error type and details
+- `github_api`: Operation name, success/failure status
+- `response_sent`: Status code, duration, granted scopes
+
+**Never logged** (regardless of URL):
+
+- OIDC token contents
+- GitHub App private key
+- Installation access tokens (ghs_...)
+- JWT tokens
+
+**Production behavior**: When invoked via the main service URL, no logs are emitted.
 
 ## Infrastructure Details
 
@@ -961,7 +987,25 @@ gcloud secrets add-iam-policy-binding github-app-private-key \
 
 ### Debugging Tips
 
-**Check Cloud Run logs**:
+**Enable logging via tag URL**:
+
+Logs are only emitted when the service is invoked via a Cloud Run tag URL. To debug:
+
+```bash
+# Deploy with a debug tag
+gcloud run deploy github-repository-token-issuer \
+  --source=./function \
+  --region=us-east4 \
+  --no-traffic \
+  --tag=debug
+
+# Invoke via tag URL to enable logging
+curl -X POST \
+  -H "Authorization: Bearer ${OIDC_TOKEN}" \
+  "https://debug---github-repository-token-issuer-HASH.a.run.app/token?contents=write"
+```
+
+**Check Cloud Run logs** (only populated when using tag URLs):
 
 ```bash
 gcloud logs read --project=PROJECT_ID \
