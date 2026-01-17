@@ -599,7 +599,9 @@ func TestTokenHandler_BearerCaseInsensitive(t *testing.T) {
 	// (will fail later due to missing GITHUB_APP_ID, but that's OK)
 	if w.Code == http.StatusUnauthorized {
 		var resp ErrorResponse
-		json.Unmarshal(w.Body.Bytes(), &resp)
+		if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("failed to unmarshal response: %v", err)
+		}
 		if strings.Contains(resp.Error, "invalid Authorization header format") {
 			t.Error("TokenHandler() should accept lowercase 'bearer'")
 		}
@@ -617,10 +619,11 @@ func TestTokenHandler_BearerCaseInsensitive(t *testing.T) {
 //  5. Verify response contains "GITHUB_APP_ID not configured" error
 //  6. Restore original GITHUB_APP_ID value
 func TestTokenHandler_MissingGitHubAppID(t *testing.T) {
-	// Step 1: Save and unset GITHUB_APP_ID
-	originalAppID := os.Getenv("GITHUB_APP_ID")
-	os.Unsetenv("GITHUB_APP_ID")
-	defer os.Setenv("GITHUB_APP_ID", originalAppID) // Step 6: Restore on cleanup
+	// Step 1: Unset GITHUB_APP_ID (t.Setenv restores original value on cleanup)
+	t.Setenv("GITHUB_APP_ID", "")
+	if err := os.Unsetenv("GITHUB_APP_ID"); err != nil {
+		t.Fatalf("failed to unset GITHUB_APP_ID: %v", err)
+	}
 
 	// Step 2: Create valid JWT and request
 	token := createTestJWT(map[string]interface{}{"repository": "owner/repo"})

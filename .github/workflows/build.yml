@@ -29,6 +29,9 @@ jobs:
     - name: Go - Build
       working-directory: ./function
       run: go build ./...
+    - name: Go - Vet
+      working-directory: ./function
+      run: go vet ./...
     - name: Go - Lint
       uses: golangci/golangci-lint-action@v9
       with:

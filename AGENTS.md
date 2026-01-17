@@ -102,6 +102,8 @@ action.yml    # Composite action in root
 - **Validation**: At system boundaries only (user input, external APIs)
 - **Abstractions**: Avoid creating them for one-time operations
 - **Configuration**: Environment variables for runtime, hardcoded Go constants for scopes
+- **Formatting**: Run `gofmt -w .` after making changes to Go code
+- **Linting**: Run both `go vet ./...` and `golangci-lint run ./...` after code is changed
 
 ## Common Tasks
 
