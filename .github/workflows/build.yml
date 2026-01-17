@@ -28,7 +28,8 @@ jobs:
         cache-dependency-path: function/go.sum
 
     - name: Build
-      run: cd function && go build ./...
+      working-directory: ./function
+      run: go build ./...
 
     - name: Lint
       uses: golangci/golangci-lint-action@v9
