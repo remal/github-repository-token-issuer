@@ -127,39 +127,29 @@ curl -X POST \
 
 The following repository permission scopes are allowed (use the Scope ID in your action):
 
-| Permission Name                | Scope ID              | Available Levels |
-|--------------------------------|-----------------------|------------------|
-| Actions                        | `actions`             | read, write      |
-| Administration                 | `administration`      | read             |
-| Attestations                   | `attestations`        | read, write      |
-| Checks                         | `checks`              | read, write      |
-| Code scanning alerts           | `code_scanning`       | read             |
-| Commit statuses                | `statuses`            | read, write      |
-| Contents                       | `contents`            | read, write      |
-| Custom properties              | `custom_properties`   | read, write      |
-| Dependabot alerts              | `dependabot_alerts`   | read             |
-| Dependabot secrets             | `dependabot_secrets`  | read, write      |
-| Deployments                    | `deployments`         | read, write      |
-| Discussions                    | `discussions`         | read, write      |
-| Environments                   | `environments`        | read, write      |
-| Issues                         | `issues`              | read, write      |
-| Merge queues                   | `merge_queues`        | read, write      |
-| Packages                       | `packages`            | read, write      |
-| Pages                          | `pages`               | read, write      |
-| Projects                       | `projects`            | read, write      |
-| Pull requests                  | `pull_requests`       | read, write      |
-| Repository security advisories | `security_advisories` | read             |
-| Secret scanning alerts         | `secret_scanning`     | read             |
-| Secrets                        | `secrets`             | read, write      |
-| Variables                      | `variables`           | read, write      |
-| Workflows                      | `workflows`           | read, write      |
+| Permission Name        | Scope ID             | Available Levels |
+|------------------------|----------------------|------------------|
+| Actions                | `actions`            | read, write      |
+| Administration         | `administration`     | read             |
+| Attestations           | `attestations`       | read, write      |
+| Checks                 | `checks`             | read, write      |
+| Commit statuses        | `statuses`           | read, write      |
+| Contents               | `contents`           | read, write      |
+| Dependabot secrets     | `dependabot_secrets` | read, write      |
+| Deployments            | `deployments`        | read, write      |
+| Discussions            | `discussions`        | read, write      |
+| Environments           | `environments`       | read, write      |
+| Issues                 | `issues`             | read, write      |
+| Merge queues           | `merge_queues`       | read, write      |
+| Packages               | `packages`           | read, write      |
+| Pages                  | `pages`              | read, write      |
+| Projects               | `projects`           | read, write      |
+| Pull requests          | `pull_requests`      | read, write      |
+| Secret scanning alerts | `secret_scanning`    | read             |
+| Secrets                | `secrets`            | read, write      |
+| Workflows              | `workflows`          | read, write      |
 
-**Note**: Some security-related scopes are restricted to read-only access in this app for safety reasons:
-
-- `code_scanning` - Code scanning alerts
-- `dependabot_alerts` - Dependabot alerts
-- `security_advisories` - Repository security advisories
-- `secret_scanning` - Secret scanning alerts
+**Note**: `secret_scanning` is restricted to read-only access for security reasons.
 
 ### Error Code Catalog
 

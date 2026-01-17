@@ -17,12 +17,16 @@ import (
 )
 
 // GetPrivateKey fetches the GitHub App private key from GCP Secret Manager.
-func GetPrivateKey(ctx context.Context, projectID string) (*rsa.PrivateKey, error) {
+func GetPrivateKey(ctx context.Context, projectID string) (privateKey *rsa.PrivateKey, err error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Secret Manager client: %w", err)
 	}
-	defer client.Close()
+	defer func() {
+		if closeErr := client.Close(); closeErr != nil && err == nil {
+			err = fmt.Errorf("failed to close Secret Manager client: %w", closeErr)
+		}
+	}()
 
 	req := &secretmanagerpb.AccessSecretVersionRequest{
 		Name: fmt.Sprintf("projects/%s/secrets/github-app-private-key/versions/latest", projectID),
@@ -40,7 +44,7 @@ func GetPrivateKey(ctx context.Context, projectID string) (*rsa.PrivateKey, erro
 	}
 
 	// Try PKCS1 format first (RSA PRIVATE KEY)
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	privateKey, err = x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
 		// Try PKCS8 format (PRIVATE KEY)
 		key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -108,7 +112,7 @@ func CreateInstallationToken(ctx context.Context, client *github.Client, install
 
 	// Use reflection-free approach: map scope IDs to struct fields
 	for scopeID, permission := range scopes {
-		permValue := github.String(permission)
+		permValue := github.Ptr(permission)
 
 		switch scopeID {
 		case "actions":
@@ -119,14 +123,8 @@ func CreateInstallationToken(ctx context.Context, client *github.Client, install
 			permissions.Attestations = permValue
 		case "checks":
 			permissions.Checks = permValue
-		case "code_scanning":
-			permissions.CodeScanning = permValue
 		case "contents":
 			permissions.Contents = permValue
-		case "custom_properties":
-			permissions.CustomProperties = permValue
-		case "dependabot_alerts":
-			permissions.DependabotAlerts = permValue
 		case "dependabot_secrets":
 			permissions.DependabotSecrets = permValue
 		case "deployments":
@@ -151,12 +149,8 @@ func CreateInstallationToken(ctx context.Context, client *github.Client, install
 			permissions.SecretScanningAlerts = permValue
 		case "secrets":
 			permissions.Secrets = permValue
-		case "security_advisories":
-			permissions.SecurityAdvisories = permValue
 		case "statuses":
 			permissions.Statuses = permValue
-		case "variables":
-			permissions.Variables = permValue
 		case "workflows":
 			permissions.Workflows = permValue
 		default:
@@ -208,17 +202,8 @@ func VerifyRequestedScopes(requested map[string]string, granted *github.Installa
 	if granted.Checks != nil {
 		grantedMap["checks"] = *granted.Checks
 	}
-	if granted.CodeScanning != nil {
-		grantedMap["code_scanning"] = *granted.CodeScanning
-	}
 	if granted.Contents != nil {
 		grantedMap["contents"] = *granted.Contents
-	}
-	if granted.CustomProperties != nil {
-		grantedMap["custom_properties"] = *granted.CustomProperties
-	}
-	if granted.DependabotAlerts != nil {
-		grantedMap["dependabot_alerts"] = *granted.DependabotAlerts
 	}
 	if granted.DependabotSecrets != nil {
 		grantedMap["dependabot_secrets"] = *granted.DependabotSecrets
@@ -256,14 +241,8 @@ func VerifyRequestedScopes(requested map[string]string, granted *github.Installa
 	if granted.Secrets != nil {
 		grantedMap["secrets"] = *granted.Secrets
 	}
-	if granted.SecurityAdvisories != nil {
-		grantedMap["security_advisories"] = *granted.SecurityAdvisories
-	}
 	if granted.Statuses != nil {
 		grantedMap["statuses"] = *granted.Statuses
-	}
-	if granted.Variables != nil {
-		grantedMap["variables"] = *granted.Variables
 	}
 	if granted.Workflows != nil {
 		grantedMap["workflows"] = *granted.Workflows

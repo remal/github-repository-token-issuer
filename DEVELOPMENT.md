@@ -165,7 +165,7 @@ terraform/             # Infrastructure as Code
 
 - `AllowedScopes`: Map of scope ID → allowed levels (read, write, or both)
 - `BlacklistedScopes`: Set of forbidden scopes
-- Read-only restrictions for security scopes (code_scanning, dependabot_alerts, etc.)
+- Read-only restrictions for security scopes (secret_scanning)
 
 #### `function/github.go`
 
@@ -311,19 +311,13 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 These scopes are intentionally restricted to read-only to prevent security risks:
 
-- `code_scanning` - Prevents tampering with security alerts
-- `dependabot_alerts` - Prevents hiding vulnerabilities
-- `security_advisories` - Prevents modifying security disclosures
 - `secret_scanning` - Prevents hiding leaked secrets
 
 **Implementation**: Hardcoded in `function/scopes.go`:
 
 ```go
 AllowedScopes = map[string][]string{
-    "code_scanning":       {"read"},
-    "dependabot_alerts":   {"read"},
-    "security_advisories": {"read"},
-    "secret_scanning":     {"read"},
+    "secret_scanning": {"read"},
     // ... other scopes with read/write
 }
 ```
@@ -673,9 +667,16 @@ No validation of Secret Manager connectivity or private key format at startup; f
 ### Prerequisites
 
 - Go 1.25+
-- Docker (for container builds)
+- Terraform (latest stable)
 - gcloud CLI (for Secret Manager access)
 - GitHub App for testing
+
+**Recommended**: Use [tenv](https://github.com/tofuutils/tenv) to manage Terraform versions:
+
+```bash
+# Install tenv (macOS)
+brew install tenv
+```
 
 ### Environment Setup
 

@@ -160,9 +160,17 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 
 // writeJSON writes a JSON response.
 func writeJSON(w http.ResponseWriter, statusCode int, data interface{}) {
+	jsonBytes, err := json.Marshal(data)
+	if err != nil {
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("internal server error: failed to encode response"))
+		return
+	}
+
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	_, _ = w.Write(jsonBytes)
 }
 
 // writeError writes a JSON error response.

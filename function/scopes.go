@@ -8,7 +8,6 @@ var AllowedScopes = map[string][]string{
 	"attestations":       {"read", "write"},
 	"checks":             {"read", "write"},
 	"contents":           {"read", "write"},
-	"custom_properties":  {"read", "write"},
 	"dependabot_secrets": {"read", "write"},
 	"deployments":        {"read", "write"},
 	"discussions":        {"read", "write"},
@@ -21,17 +20,11 @@ var AllowedScopes = map[string][]string{
 	"pull_requests":      {"read", "write"},
 	"secrets":            {"read", "write"},
 	"statuses":           {"read", "write"},
-	"variables":          {"read", "write"},
 	"workflows":          {"read", "write"},
 
 	// Read-only permissions (security and administrative)
-	"administration": {"read"}, // Repository administration settings
-
-	// Security-related scopes restricted to read-only to prevent tampering
-	"code_scanning":       {"read"}, // Code scanning alerts
-	"dependabot_alerts":   {"read"}, // Dependabot vulnerability alerts
-	"secret_scanning":     {"read"}, // Secret scanning alerts
-	"security_advisories": {"read"}, // Repository security advisories
+	"administration":  {"read"}, // Repository administration settings
+	"secret_scanning": {"read"}, // Secret scanning alerts
 }
 
 // BlacklistedScopes defines scopes that are explicitly forbidden.
