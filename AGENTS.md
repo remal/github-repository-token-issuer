@@ -102,6 +102,7 @@ action.yml    # Composite action in root
 - **Abstractions**: Avoid creating them for one-time operations
 - **Configuration**: Environment variables for runtime, hardcoded Go constants for scopes
 - **Formatting**: Run `gofmt -w .` after making changes to Go code
+- **Terraform Formatting**: Run `terraform fmt -recursive` after making changes to Terraform files
 - **Linting**: Run both `go vet ./...` and `golangci-lint run ./...` after code is changed
 
 ## Common Tasks
