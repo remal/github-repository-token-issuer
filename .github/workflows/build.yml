@@ -21,17 +21,29 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v6
 
-    - name: Setup Go
+    - name: Go - Setup
       uses: actions/setup-go@v6
       with:
         go-version: '1.25'
         cache-dependency-path: function/go.sum
-
-    - name: Build
+    - name: Go - Build
       working-directory: ./function
       run: go build ./...
-
-    - name: Lint
+    - name: Go - Lint
       uses: golangci/golangci-lint-action@v9
       with:
         working-directory: function
+
+    - name: Terraform - Read version
+      id: terraform-version
+      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+    - name: Terraform - Setup
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{steps.terraform-version.outputs.version}}
+    - name: Terraform - Init
+      working-directory: ./terraform
+      run: terraform init -backend=false
+    - name: Terraform - Validate
+      working-directory: ./terraform
+      run: terraform validate
