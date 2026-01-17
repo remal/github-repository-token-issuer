@@ -53,8 +53,9 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
       resources {
         limits = {
           memory = "128Mi"
-          cpu    = "1"
+          cpu    = "0.5"
         }
+        cpu_idle = true # Throttle CPU when idle (allows <512Mi memory, reduces cost)
       }
 
       env {
