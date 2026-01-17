@@ -32,3 +32,5 @@ jobs:
 
     - name: Lint
       uses: golangci/golangci-lint-action@v9
+      with:
+        working-directory: function
