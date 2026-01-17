@@ -114,8 +114,8 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
 
-  # No attribute condition - allow any GitHub repository to authenticate
-  # Authorization is handled by the service itself
+  # Require valid repository claim - authorization handled by the service
+  attribute_condition = "attribute.repository != ''"
 }
 
 # Data source to get project number
