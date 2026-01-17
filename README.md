@@ -12,7 +12,7 @@ A secure, serverless GitHub App hosted on Google Cloud Platform that issues shor
 
 ## Overview
 
-This GitHub App provides a secure mechanism for GitHub Actions workflows to obtain short-lived GitHub installation tokens with specific scopes and permissions. The app runs as a Cloud Function (2nd gen) on GCP and authenticates callers using GitHub's OIDC tokens integrated with GCP IAM.
+This GitHub App provides a secure mechanism for GitHub Actions workflows to obtain short-lived GitHub installation tokens with specific scopes and permissions. The app runs as a Cloud Run service on GCP and authenticates callers using GitHub's OIDC tokens integrated with GCP IAM.
 
 ### Why Use This?
 
@@ -36,7 +36,7 @@ This app solves these problems by issuing short-lived GitHub App installation to
 
 ### Key Features
 
-- Serverless Cloud Function (2nd gen) for automatic scaling
+- Serverless Cloud Run service for automatic scaling
 - GitHub OIDC token validation via GCP IAM
 - Scope allowlisting and blacklisting for security
 - Simple API with query parameter-based scope specification
@@ -168,13 +168,13 @@ The following repository permission scopes are allowed (use the Scope ID in your
 
 ```
 .
-├── function/                  # Cloud Function (2nd gen) source code
+├── function/                  # Cloud Run service source code
 ├── terraform/                 # Infrastructure as Code
 ├── action.yml                 # Composite GitHub Action
 ├── .github/
 │   └── workflows/
 │       └── deploy.yml         # CI/CD deployment workflow
-├── AGENTS.md                   # AI agent development guidelines
+├── AGENTS.md                  # AI agent development guidelines
 ├── CLAUDE.md                  # Claude development entry point
 ├── DEVELOPMENT.md             # Technical implementation details
 └── README.md                  # This file

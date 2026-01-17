@@ -19,7 +19,7 @@ Technical implementation details and architecture documentation for the GitHub R
 
 ### High-Level Design
 
-The app is a stateless Cloud Function (2nd gen) that acts as a broker between GitHub Actions workflows and GitHub's installation token API. It validates requests, checks permissions, and issues short-lived tokens.
+The app is a stateless Cloud Run service that acts as a broker between GitHub Actions workflows and GitHub's installation token API. It validates requests, checks permissions, and issues short-lived tokens.
 
 **Priorities (in order):**
 
@@ -41,14 +41,14 @@ The app is a stateless Cloud Function (2nd gen) that acts as a broker between Gi
 │ GitHub Actions Workflow                                      │
 │                                                              │
 │  1. Obtain OIDC token from GitHub                           │
-│  2. Call Cloud Function with OIDC token as IAM bearer       │
+│  2. Call Cloud Run with OIDC token as IAM bearer            │
 │     POST /token?contents=write&deployments=write            │
 │     Authorization: Bearer <GITHUB_OIDC_TOKEN>               │
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ GCP Cloud Function (2nd gen) (Go)                           │
+│ GCP Cloud Run (Go)                                           │
 │                                                              │
 │  1. GCP IAM validates GitHub OIDC token                      │
 │  2. Extract repository claim from OIDC token                 │
@@ -75,11 +75,11 @@ The app is a stateless Cloud Function (2nd gen) that acts as a broker between Gi
 ```
 1. GitHub Actions Workflow
    └─> Obtains OIDC token via ACTIONS_ID_TOKEN_REQUEST_URL
-   └─> Calls Cloud Function with OIDC token as Authorization header
+   └─> Calls Cloud Run with OIDC token as Authorization header
 
-2. Cloud Function IAM Layer
+2. Cloud Run IAM Layer
    └─> Validates OIDC token signature and issuer
-   └─> Checks token audience matches Cloud Function URL
+   └─> Checks token audience matches Cloud Run URL
    └─> Verifies token hasn't expired
    └─> Allows request through if valid
 
@@ -109,16 +109,16 @@ The app is a stateless Cloud Function (2nd gen) that acts as a broker between Gi
 
 **Request Flow Summary**:
 
-1. GitHub Actions Workflow generates OIDC token and calls Cloud Function
-2. GCP IAM validates GitHub OIDC token for Cloud Function invocation
-3. Function extracts repository from OIDC claims
-4. Function parses scope permissions from query parameters
-5. Function validates scopes against hardcoded allowlist/blacklist
-6. Function fetches GitHub App private key from Secret Manager
-7. Function creates JWT (10-minute expiry) to authenticate as GitHub App
-8. Function queries GitHub API for App installation and permissions
-9. Function creates installation token (1-hour expiry) with requested scopes
-10. Function returns token and metadata as JSON response
+1. GitHub Actions Workflow generates OIDC token and calls Cloud Run
+2. GCP IAM validates GitHub OIDC token for Cloud Run invocation
+3. Service extracts repository from OIDC claims
+4. Service parses scope permissions from query parameters
+5. Service validates scopes against hardcoded allowlist/blacklist
+6. Service fetches GitHub App private key from Secret Manager
+7. Service creates JWT (10-minute expiry) to authenticate as GitHub App
+8. Service queries GitHub API for App installation and permissions
+9. Service creates installation token (1-hour expiry) with requested scopes
+10. Service returns token and metadata as JSON response
 
 ## Code Structure
 
@@ -136,7 +136,7 @@ function/               # Go application code
 terraform/             # Infrastructure as Code
 ├── main.tf            # All GCP resources
 ├── variables.tf       # Input variables
-└── outputs.tf         # Output values (Cloud Function URL)
+└── outputs.tf         # Output values (Cloud Run URL)
 ```
 
 ### Key Files
@@ -272,7 +272,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 | Duplicate scope          | 400    | Same scope appears multiple times | Reject request              |
 | Invalid scope            | 400    | Scope not in allowlist            | Reject request              |
 | Blacklisted scope        | 400    | Scope in blacklist                | Reject request              |
-| Invalid OIDC             | 401    | GCP IAM rejection                 | Should never reach function |
+| Invalid OIDC             | 401    | GCP IAM rejection                 | Should never reach service  |
 | App not installed        | 403    | GitHub App not on repo            | Reject request              |
 | Insufficient permissions | 403    | App lacks permission              | Reject request              |
 | Secret Manager error     | 500    | Can't fetch private key           | Reject request              |
@@ -305,9 +305,10 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 1. Generate new key on GitHub
 2. Update Secret Manager secret
-3. Deploy new function version
-4. Switch traffic
-5. Revoke old key
+3. Deploy new Cloud Run revision with `--no-traffic`
+4. Test via tagged URL
+5. Switch traffic to new revision
+6. Revoke old key
 
 ### Read-Only Security Scopes
 
@@ -360,7 +361,7 @@ AllowedScopes = map[string][]string{
 ### Runtime Environment
 
 - **Language**: Go 1.25+
-- **Platform**: Google Cloud Functions (2nd generation)
+- **Platform**: Google Cloud Run
 - **Scaling**:
   - Minimum instances: 0 (cost optimization)
   - Maximum instances: 10 (low volume workload)
@@ -375,13 +376,15 @@ AllowedScopes = map[string][]string{
 
 ### Build & Deployment
 
-- **Source-based deployment**: Function source code uploaded to GCS, built by Google Cloud Build
-  - Runtime: go125 (Go 1.25)
-  - Entry point: TokenHandler function
-  - Build managed by Google Cloud Functions
+- **Source-based deployment**: Service deployed via `gcloud run deploy --source`
+  - Cloud Build automatically builds from source using Buildpacks
+  - Functions Framework handles HTTP server setup
+  - No Dockerfile required
+- **Infrastructure**: Terraform manages Cloud Run service, IAM, and supporting resources
+  - Service image managed by gcloud, not Terraform (via `lifecycle.ignore_changes`)
 - **CI/CD**: GitHub Actions workflow (.github/workflows/deploy.yml)
   - Triggered on push to main branch
-  - Steps: Lint → Terraform plan review → Deploy
+  - Steps: Lint → Terraform plan → gcloud deploy
 
 ## API Reference
 
@@ -538,13 +541,14 @@ The function authenticates as the GitHub App using JWT:
 
 ### Key Rotation Strategy
 
-**Blue-Green Deployment Approach**:
+**Canary Deployment Approach**:
 
 1. Generate new GitHub App private key
 2. Update Secret Manager with new key
-3. Deploy new function version with reference to new secret
-4. Switch Cloud Run traffic to new version
-5. Revoke old private key on GitHub
+3. Deploy new revision with `--no-traffic --tag=canary`
+4. Test via tagged URL (e.g., `https://canary---service-hash.a.run.app`)
+5. Gradually shift traffic to new revision
+6. Revoke old private key on GitHub
 
 ### Scope Management Details
 
@@ -603,38 +607,32 @@ When parsing query parameters:
 
 All infrastructure defined in `terraform/main.tf`:
 
-1. **Cloud Function (2nd gen)**
+1. **Cloud Run Service**
 
 - Name: `github-repository-token-issuer`
-- Region: User-configurable (e.g., `us-central1`)
-- Runtime: go125 (Go 1.25)
-- Entry point: TokenHandler
-- Source: Uploaded to GCS bucket, built by Google Cloud Build
+- Region: User-configurable (e.g., `us-east4`)
+- Image: Managed by gcloud (placeholder in Terraform)
 - Environment variables: `GITHUB_APP_ID`
+- Scaling: 0-10 instances
+- Memory: 128Mi
 
-2. **GCS Bucket for Source Code**
-
-- Name: `{project_id}-github-token-issuer-source`
-- Purpose: Store function source code archives
-- Used by Cloud Functions for deployment
-
-3. **Secret Manager Secret**
+2. **Secret Manager Secret**
 
 - Name: `github-app-private-key`
 - Contains: GitHub App private key in PEM format
-- Access: Cloud Function service account has `secretmanager.secretAccessor` role
+- Access: Cloud Run service account has `secretmanager.secretAccessor` role
 
-4. **Service Account**
+3. **Service Account**
 
-- Name: `github-repository-token-issuer-sa`
-- Purpose: Cloud Function service identity
+- Name: `gh-repo-token-issuer-sa`
+- Purpose: Cloud Run service identity
 - Permissions: Secret Manager access
 
-5. **IAM Bindings**
+4. **IAM Bindings**
 
-- GitHub OIDC federation to invoke Cloud Function
+- GitHub OIDC federation to invoke Cloud Run
 - Configured to accept tokens with specific `aud` claim
-- Maps GitHub repository claims to Cloud Function invoke permissions
+- Maps GitHub repository claims to Cloud Run invoke permissions
 
 ### Terraform State Management
 
@@ -651,13 +649,13 @@ All infrastructure defined in `terraform/main.tf`:
 
 ### Configuration Storage
 
-- **GitHub App ID**: Environment variable `GITHUB_APP_ID` on Cloud Function
+- **GitHub App ID**: Environment variable `GITHUB_APP_ID` on Cloud Run service
 - **GitHub App Private Key**: GCP Secret Manager secret `github-app-private-key`
 - **Scope Allowlist/Blacklist**: Hardcoded in Go source code (`function/scopes.go`)
 
 ### Startup Validation
 
-The function performs the following validation during initialization:
+The service performs the following validation during initialization:
 
 - Check that required environment variables are present (`GITHUB_APP_ID`)
 - Fail fast at startup if configuration is invalid
@@ -782,6 +780,7 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    gcloud services enable run.googleapis.com
    gcloud services enable secretmanager.googleapis.com
    gcloud services enable iamcredentials.googleapis.com
+   gcloud services enable cloudbuild.googleapis.com
    ```
 
 3. **Store GitHub App Private Key**:
@@ -801,7 +800,7 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    # Create terraform.tfvars
    cat > terraform.tfvars <<EOF
    project_id = "your-gcp-project-id"
-   region = "us-central1"
+   region = "us-east4"
    github_app_id = "123456"
    EOF
    ```
@@ -810,6 +809,14 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    ```bash
    terraform plan
    terraform apply
+   ```
+
+6. **Deploy Service Code**:
+   ```bash
+   # Deploy from source (Buildpacks builds automatically)
+   gcloud run deploy github-repository-token-issuer \
+     --source=./function \
+     --region=us-east4
    ```
 
 ### Terraform Workflow
@@ -827,28 +834,46 @@ terraform plan -var="github_app_id=123456" -var="project_id=my-project"
 terraform apply
 ```
 
-### Cloud Function Deployment
+### Cloud Run Deployment
 
 **Terraform handles**:
 
-1. Archiving function source code to ZIP
-2. Uploading ZIP to GCS bucket
-3. Deploying Cloud Function (2nd gen) with source from GCS
-4. Configuring environment variables
-5. Setting up IAM bindings for OIDC
+1. Creating Cloud Run service with placeholder image
+2. Configuring environment variables
+3. Setting up IAM bindings for OIDC
+4. Managing service account permissions
 
-**Manual deployment** (if needed):
+**gcloud handles**:
+
+1. Building source code via Cloud Build (Buildpacks)
+2. Creating container image
+3. Deploying new revisions
+
+**Standard deployment**:
 
 ```bash
-# Deploy function from source
-gcloud functions deploy github-repository-token-issuer \
-  --gen2 \
-  --runtime=go125 \
-  --region=us-central1 \
+gcloud run deploy github-repository-token-issuer \
   --source=./function \
-  --entry-point=TokenHandler \
-  --set-env-vars GITHUB_APP_ID=123456 \
-  --no-allow-unauthenticated
+  --region=us-east4
+```
+
+**Canary deployment** (with traffic control):
+
+```bash
+# Deploy new revision without traffic
+gcloud run deploy github-repository-token-issuer \
+  --source=./function \
+  --region=us-east4 \
+  --no-traffic \
+  --tag=canary
+
+# Test via tagged URL
+curl https://canary---github-repository-token-issuer-HASH.a.run.app/token
+
+# Shift traffic when ready
+gcloud run services update-traffic github-repository-token-issuer \
+  --region=us-east4 \
+  --to-latest
 ```
 
 ### CI/CD Pipeline
@@ -858,7 +883,8 @@ gcloud functions deploy github-repository-token-issuer \
 1. **Lint**: Run `golangci-lint` on `function/`
 2. **Build**: Compile Go binary to verify build works
 3. **Terraform Plan**: Show infrastructure changes
-4. **Deploy**: Apply Terraform to deploy new version
+4. **Terraform Apply**: Apply infrastructure changes
+5. **Deploy**: Run `gcloud run deploy --source` for code changes
 
 **Triggered on**: Push to `main` branch
 
@@ -935,11 +961,11 @@ gcloud secrets add-iam-policy-binding github-app-private-key \
 
 ### Debugging Tips
 
-**Check Cloud Function logs**:
+**Check Cloud Run logs**:
 
 ```bash
 gcloud logs read --project=PROJECT_ID \
-  --resource-type=cloud_function \
+  --resource-type=cloud_run_revision \
   --limit=50
 ```
 
@@ -985,7 +1011,7 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 
 - Min instances: 0 (cost optimization)
 - Max instances: 10 (low volume expected)
-- Concurrency: 80 requests per instance
+- Concurrency: 80 requests per instance (Cloud Run default)
 
 **No state to share**: Each instance is independent
 
@@ -1001,9 +1027,9 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 
 **Estimated cost** (for <100 requests/day):
 
-- Cloud Functions: <$1/month
+- Cloud Run: <$1/month
 - Secret Manager: <$0.10/month
-- GCS (source storage): <$0.05/month
+- Cloud Build: <$0.10/month (builds are infrequent)
 - Total: <$2/month
 
 ## Future Improvements

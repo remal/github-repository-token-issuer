@@ -28,14 +28,14 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 ## Technology Stack
 
 - **Language**: Go 1.25+
-- **Platform**: Google Cloud Functions (2nd generation)
+- **Platform**: Google Cloud Run
 - **IaC**: Terraform (single main.tf file, GCS backend with locking)
-- **CI/CD**: GitHub Actions (lint → terraform plan → deploy)
+- **CI/CD**: GitHub Actions (lint → terraform plan → gcloud deploy)
 - **Libraries**:
   - `google/go-github` for GitHub API
   - `golang-jwt/jwt` or go-github's JWT methods
   - GCP Go SDK for Secret Manager
-  - `GoogleCloudPlatform/functions-framework-go` for Cloud Functions runtime
+  - `GoogleCloudPlatform/functions-framework-go` for HTTP server
 
 ## Code Organization
 
@@ -126,10 +126,10 @@ action.yml    # Composite action in root
 
 ## Deployment Approach
 
-- **Changes to function/**: Requires terraform apply (archives and uploads source to GCS, triggers rebuild)
-- **Changes to terraform/**: Run terraform plan first, then apply
-- **CI/CD**: Triggered on push to main, runs lint → plan → deploy
-- **No canary/blue-green** except for key rotation
+- **Changes to function/**: Run `gcloud run deploy --source ./function` (Terraform ignores image changes)
+- **Changes to terraform/**: Run `terraform validate`, then plan, then apply
+- **CI/CD**: Triggered on push to main, runs lint → terraform → gcloud deploy
+- **Canary deployments**: Use `--no-traffic --tag=canary` for safe rollouts
 
 ## Scope Management
 
@@ -290,9 +290,9 @@ function/
 
 ```
 terraform/
-├── main.tf      # All GCP resources (Cloud Function, GCS bucket, Secret Manager, IAM)
+├── main.tf      # All GCP resources (Cloud Run, Secret Manager IAM, Workload Identity)
 ├── variables.tf # Input variables (project_id, region, github_app_id)
-└── outputs.tf   # Output values (Cloud Function URL)
+└── outputs.tf   # Output values (Cloud Run URL)
 ```
 
 ## Future Work
@@ -306,6 +306,5 @@ terraform/
 ## Version Information
 
 - **Go Version**: Always use 1.25+ or 1.25.* in documentation
-- **Cloud Functions Runtime**: go125
-- **Cloud Functions**: 2nd generation
+- **Cloud Run**: Source-based deployment using Buildpacks
 - **Terraform**: Latest stable version

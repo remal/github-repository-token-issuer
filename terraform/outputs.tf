@@ -1,11 +1,11 @@
-output "cloud_function_url" {
-  description = "The URL of the deployed Cloud Function"
-  value       = google_cloudfunctions2_function.github_token_issuer.service_config[0].uri
+output "cloud_run_url" {
+  description = "The URL of the deployed Cloud Run service"
+  value       = google_cloud_run_v2_service.github_token_issuer.uri
 }
 
 output "service_account_email" {
-  description = "The email of the Cloud Function service account"
-  value       = google_service_account.cloud_function_sa.email
+  description = "The email of the Cloud Run service account"
+  value       = google_service_account.cloud_run_sa.email
 }
 
 output "workload_identity_pool_provider" {

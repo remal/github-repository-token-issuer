@@ -18,6 +18,7 @@ transformations:
     })
     content.excludes = content.excludes ?? []
     ;[
+      '.github/workflows/check-action-secrets.yml',
       '.github/workflows/release-drafter.yml',
       '.github/release-drafter.yml',
     ].forEach(path => {
