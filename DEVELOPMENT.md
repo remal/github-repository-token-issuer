@@ -32,42 +32,42 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 1. **Stateless** - No database or persistent storage, all validation happens per-request
 2. **Fail Fast** - Errors are returned immediately without retries to keep logic simple
 3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request to avoid stale data
-4. **Conditional Logging** - Logs are only emitted when service is invoked via Cloud Run tag URLs (for debugging canary deployments)
+4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
 
 ### Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────┐
 │ GitHub Actions Workflow                                      │
 │                                                              │
-│  1. Obtain OIDC token from GitHub                           │
-│  2. Call Cloud Run with OIDC token as IAM bearer            │
-│     POST /token?contents=write&deployments=write            │
-│     Authorization: Bearer <GITHUB_OIDC_TOKEN>               │
-└─────────────────────┬───────────────────────────────────────┘
+│  1. Obtain OIDC token from GitHub                            │
+│  2. Call Cloud Run with OIDC token as IAM bearer             │
+│     POST /token?contents=write&deployments=write             │
+│     Authorization: Bearer <GITHUB_OIDC_TOKEN>                │
+└─────────────────────┬────────────────────────────────────────┘
                       │
                       ▼
-┌─────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────┐
 │ GCP Cloud Run (Go)                                           │
 │                                                              │
 │  1. GCP IAM validates GitHub OIDC token                      │
 │  2. Extract repository claim from OIDC token                 │
 │  3. Parse scope query parameters                             │
 │  4. Validate scopes against allowlist/blacklist              │
-│  5. Fetch GitHub App private key from Secret Manager        │
+│  5. Fetch GitHub App private key from Secret Manager         │
 │  6. Create JWT to authenticate as GitHub App                 │
 │  7. Fetch App permissions from GitHub API                    │
 │  8. Verify repo has App installed                            │
 │  9. Verify requested scopes don't exceed granted permissions │
 │ 10. Create installation token via GitHub API                 │
 │ 11. Return token with metadata                               │
-└─────────────────────┬───────────────────────────────────────┘
+└─────────────────────┬────────────────────────────────────────┘
                       │
                       ▼
-┌─────────────────────────────────────────────────────────────┐
+┌──────────────────────────────────────────────────────────────┐
 │ GCP Secret Manager                                           │
 │  - GitHub App Private Key (PEM format)                       │
-└─────────────────────────────────────────────────────────────┘
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ### Request Flow Details
@@ -131,7 +131,6 @@ function/               # Go application code
 ├── github.go          # GitHub API client and JWT logic
 ├── validation.go      # Scope and OIDC validation
 ├── scopes.go          # Allowlist/blacklist definitions
-├── logging.go         # Conditional logging (tag URL only)
 └── go.mod             # Go module dependencies
 
 terraform/             # Infrastructure as Code
@@ -170,15 +169,6 @@ terraform/             # Infrastructure as Code
 - `BlacklistedScopes`: Set of forbidden scopes
 - Read-only restrictions for security scopes (secret_scanning)
 
-#### `function/logging.go`
-
-- `RequestLogger`: Conditional logger that only emits logs when invoked via tag URL
-- `NewRequestLogger()`: Creates logger, detects tag URLs by checking if Host contains `---`
-- `LogRequest()`: Logs incoming request with repository and scope names
-- `LogValidationError()`: Logs validation failures
-- `LogGitHubAPICall()`: Logs GitHub API call outcomes
-- `LogResponse()`: Logs final response with status, duration, and granted scopes
-
 #### `function/github.go`
 
 - `NewGitHubClient()`: Initialize go-github SDK client
@@ -214,14 +204,14 @@ repository := extractClaimFromJWT(token, "repository")
 // Parse ?contents=write&issues=read&deployments=write
 scopes := make(map[string]string)
 for param, values := range r.URL.Query() {
-    if len(values) > 1 {
-        return fmt.Errorf("duplicate scope '%s' in request", param)
-    }
-    permission := values[0]
-    if permission != "read" && permission != "write" {
-        return fmt.Errorf("invalid permission '%s' for scope '%s'", permission, param)
-    }
-    scopes[param] = permission
+if len(values) > 1 {
+return fmt.Errorf("duplicate scope '%s' in request", param)
+}
+permission := values[0]
+if permission != "read" && permission != "write" {
+return fmt.Errorf("invalid permission '%s' for scope '%s'", permission, param)
+}
+scopes[param] = permission
 }
 ```
 
@@ -238,9 +228,9 @@ for param, values := range r.URL.Query() {
 ```go
 // JWT claims
 claims := jwt.MapClaims{
-    "iat": time.Now().Unix(),
-    "exp": time.Now().Add(10 * time.Minute).Unix(), // GitHub max
-    "iss": os.Getenv("GITHUB_APP_ID"),
+"iat": time.Now().Unix(),
+"exp": time.Now().Add(10 * time.Minute).Unix(), // GitHub max
+"iss": os.Getenv("GITHUB_APP_ID"),
 }
 
 // Sign with RS256 using private key
@@ -255,11 +245,11 @@ signedToken, err := token.SignedString(privateKey)
 ```go
 // Request installation token with specific scopes
 opts := &github.InstallationTokenOptions{
-    Permissions: &github.InstallationPermissions{
-        Contents:    github.String("write"),
-        Deployments: github.String("write"),
-        Statuses:    github.String("write"),
-    },
+Permissions: &github.InstallationPermissions{
+Contents:    github.String("write"),
+Deployments: github.String("write"),
+Statuses:    github.String("write"),
+},
 }
 
 token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
@@ -277,16 +267,16 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 **Fail Fast Philosophy**: Return errors immediately without retries.
 
-| Error                    | Status | When                              | Action                      |
-|--------------------------|--------|-----------------------------------|-----------------------------|
-| Duplicate scope          | 400    | Same scope appears multiple times | Reject request              |
-| Invalid scope            | 400    | Scope not in allowlist            | Reject request              |
-| Blacklisted scope        | 400    | Scope in blacklist                | Reject request              |
-| Invalid OIDC             | 401    | GCP IAM rejection                 | Should never reach service  |
-| App not installed        | 403    | GitHub App not on repo            | Reject request              |
-| Insufficient permissions | 403    | App lacks permission              | Reject request              |
-| Secret Manager error     | 500    | Can't fetch private key           | Reject request              |
-| GitHub API error         | 503    | GitHub unavailable                | Reject request              |
+| Error                    | Status | When                              | Action                     |
+|--------------------------|--------|-----------------------------------|----------------------------|
+| Duplicate scope          | 400    | Same scope appears multiple times | Reject request             |
+| Invalid scope            | 400    | Scope not in allowlist            | Reject request             |
+| Blacklisted scope        | 400    | Scope in blacklist                | Reject request             |
+| Invalid OIDC             | 401    | GCP IAM rejection                 | Should never reach service |
+| App not installed        | 403    | GitHub App not on repo            | Reject request             |
+| Insufficient permissions | 403    | App lacks permission              | Reject request             |
+| Secret Manager error     | 500    | Can't fetch private key           | Reject request             |
+| GitHub API error         | 503    | GitHub unavailable                | Reject request             |
 
 **No retries because**:
 
@@ -330,8 +320,8 @@ These scopes are intentionally restricted to read-only to prevent security risks
 
 ```go
 AllowedScopes = map[string][]string{
-    "secret_scanning": {"read"},
-    // ... other scopes with read/write
+"secret_scanning": {"read"},
+// ... other scopes with read/write
 }
 ```
 
@@ -350,24 +340,16 @@ AllowedScopes = map[string][]string{
 - Repository claim exists
 - Repository format is valid (owner/repo)
 
-### Conditional Logging and Sensitive Data
+### Sensitive Data Protection
 
-Logs are only emitted when the service is invoked via Cloud Run tag URLs (e.g., `https://canary---service-hash.a.run.app`). This design enables debugging during canary deployments without incurring logging costs in production.
-
-**Never logged** (regardless of invocation method):
+The service handles sensitive data that must never be exposed:
 
 - OIDC token contents
 - GitHub App private key
 - Installation access tokens
 - JWT tokens
 
-**Logged only via tag URLs**:
-
-- Repository name (from OIDC claim)
-- Requested scope names (not tokens)
-- Error types and details
-- Request timestamps and duration
-- GitHub API operation outcomes
+No logging is performed by the service to prevent accidental exposure of sensitive data.
 
 ## Technical Specifications
 
@@ -604,28 +586,6 @@ When parsing query parameters:
 - **Secret Manager Unavailable**: Fail immediately (no caching or fallback)
 - **Archived Repository**: Attempt token issuance anyway; let GitHub API return error if necessary
 - **Suspended GitHub App Installation**: Return 403 with clear error message
-
-**Logging Strategy**:
-
-**Conditional Logging** (tag URLs only):
-
-Logs are emitted only when the service is invoked via a Cloud Run tag URL (e.g., `https://canary---service-hash.a.run.app`). This enables debugging during canary deployments without incurring logging costs in production.
-
-**Logged events** (only via tag URLs):
-
-- `request_received`: Repository, requested scope names
-- `validation_failed`: Error type and details
-- `github_api`: Operation name, success/failure status
-- `response_sent`: Status code, duration, granted scopes
-
-**Never logged** (regardless of URL):
-
-- OIDC token contents
-- GitHub App private key
-- Installation access tokens (ghs_...)
-- JWT tokens
-
-**Production behavior**: When invoked via the main service URL, no logs are emitted.
 
 ## Infrastructure Details
 
@@ -945,7 +905,7 @@ To make a scope read-only (like security scopes):
 
 ```go
 AllowedScopes = map[string][]string{
-    "my_scope": {"read"}, // Remove "write"
+"my_scope": {"read"}, // Remove "write"
 }
 ```
 
@@ -986,32 +946,6 @@ gcloud secrets add-iam-policy-binding github-app-private-key \
 **Fix**: Ensure action.yml and workflow only specify each scope once
 
 ### Debugging Tips
-
-**Enable logging via tag URL**:
-
-Logs are only emitted when the service is invoked via a Cloud Run tag URL. To debug:
-
-```bash
-# Deploy with a debug tag
-gcloud run deploy github-repository-token-issuer \
-  --source=./function \
-  --region=us-east4 \
-  --no-traffic \
-  --tag=debug
-
-# Invoke via tag URL to enable logging
-curl -X POST \
-  -H "Authorization: Bearer ${OIDC_TOKEN}" \
-  "https://debug---github-repository-token-issuer-HASH.a.run.app/token?contents=write"
-```
-
-**Check Cloud Run logs** (only populated when using tag URLs):
-
-```bash
-gcloud logs read --project=PROJECT_ID \
-  --resource-type=cloud_run_revision \
-  --limit=50
-```
 
 **Verify Secret Manager access**:
 
