@@ -35,9 +35,10 @@ resource "google_secret_manager_secret_iam_member" "secret_accessor" {
 
 # Cloud Run service
 resource "google_cloud_run_v2_service" "github_token_issuer" {
+  deletion_protection = false
   #name     = "github-repository-token-issuer"
-  name                = "gh-repo-token-issuer"
-  location            = var.region
+  name     = "gh-repo-token-issuer"
+  location = var.region
 
   template {
     service_account = google_service_account.cloud_run_sa.email
