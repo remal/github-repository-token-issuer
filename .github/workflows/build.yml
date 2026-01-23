@@ -125,7 +125,7 @@ jobs:
     - name: Install gcloud SDK
       uses: google-github-actions/setup-gcloud@v3
       with:
-        project_id: github-repository-token-issuer
+        project_id: 789540387022
         install_components: beta
 
     - name: Deploy
