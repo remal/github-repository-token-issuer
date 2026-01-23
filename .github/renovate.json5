@@ -10,6 +10,9 @@
   },
 
   // $$$sync-with-template-modifiable: local $$$
+  schedule: "* * * * 0,6",
+  // every weekend
+
   packageRules: [
     {
       matchManagers: [
