@@ -19,6 +19,11 @@ provider "google" {
   region  = var.region
 }
 
+# Data source to get project number
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
 # Service Account for Cloud Run
 resource "google_service_account" "cloud_run_sa" {
   account_id   = "gh-repo-token-issuer-sa"
@@ -76,8 +81,9 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
   lifecycle {
     ignore_changes = [
       template[0].containers[0].image,
+      template[0].containers[0].base_image_uri,
+      template[0].containers[0].source_code,
       template[0].revision,
-      template[0].source,
       client,
       client_version,
     ]
@@ -122,9 +128,4 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 
   # Require valid repository claim - authorization handled by the service
   attribute_condition = "attribute.repository != ''"
-}
-
-# Data source to get project number
-data "google_project" "project" {
-  project_id = var.project_id
 }
