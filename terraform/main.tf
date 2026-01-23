@@ -85,6 +85,8 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
       template[0].containers[0].image,
       template[0].containers[0].base_image_uri,
       template[0].containers[0].command,
+      template[0].containers[0].source_code[0],
+      template[0].containers[0].source_code[0].cloud_storage_source[0],
       template[0].containers[0].source_code[0].cloud_storage_source[0].bucket,
       template[0].containers[0].source_code[0].cloud_storage_source[0].object,
       template[0].revision,
