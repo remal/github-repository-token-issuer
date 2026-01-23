@@ -10,8 +10,7 @@
   },
 
   // $$$sync-with-template-modifiable: local $$$
-  schedule: "* * * * 0,6",
-  // every weekend
+  schedule: "* * * * 6",
 
   packageRules: [
     {
