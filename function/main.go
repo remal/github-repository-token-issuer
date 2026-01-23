@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/GoogleCloudPlatform/functions-framework-go/funcframework"
@@ -12,7 +11,7 @@ func init() {
 	// Validate required environment variables at startup
 	appID := os.Getenv("GITHUB_APP_ID")
 	if appID == "" {
-		log.Fatal("GITHUB_APP_ID environment variable is required")
+		os.Exit(1)
 	}
 
 	// Register HTTP function
@@ -27,6 +26,6 @@ func main() {
 	}
 
 	if err := funcframework.Start(port); err != nil {
-		log.Fatalf("funcframework.Start: %v", err)
+		os.Exit(1)
 	}
 }
