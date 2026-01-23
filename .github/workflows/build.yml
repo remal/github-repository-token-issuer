@@ -93,9 +93,11 @@ jobs:
         service_account: gh-actions-sa@github-repository-token-issuer.iam.gserviceaccount.com
 
     - name: Terraform - Read version
+      if: ${{github.ref == 'refs/heads/main'}}
       id: terraform-version
       run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
     - name: Terraform - Setup
+      if: ${{github.ref == 'refs/heads/main'}}
       uses: hashicorp/setup-terraform@v3
       with:
         terraform_version: ${{steps.terraform-version.outputs.version}}
@@ -107,3 +109,21 @@ jobs:
       if: ${{github.ref == 'refs/heads/main'}}
       working-directory: ./terraform
       run: terraform apply -auto-approve
+
+    - name: Go - Setup
+      uses: actions/setup-go@v6
+      with:
+        go-version: '1.25'
+        cache-dependency-path: function/go.sum
+    - name: Go - Build
+      working-directory: ./function
+      env:
+        GOOS: linux
+        GOARCH: amd64
+      run: go build ./...
+
+    - name: Deploy
+      working-directory: ./function
+      run: |
+        gcloud components install beta
+

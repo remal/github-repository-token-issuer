@@ -41,6 +41,8 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
   template {
     service_account = google_service_account.cloud_run_sa.email
 
+    max_instance_request_concurrency = 50
+
     scaling {
       min_instance_count = 0
       max_instance_count = 10
