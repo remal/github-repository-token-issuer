@@ -91,7 +91,7 @@ After successful deployment, Terraform will output the Cloud Run service URL.
 
 This configuration creates the following GCP resources:
 
-- **Cloud Run Service** (`github-repository-token-issuer`) - The serverless function
+- **Cloud Run Service** (`gh-repo-token-issuer`) - The serverless function
 - **Service Account** (`gh-repo-token-issuer-sa`) - Identity for Cloud Run
 - **Artifact Registry Repository** - Docker container registry
 - **Workload Identity Pool** (`github-actions`) - For GitHub OIDC authentication
@@ -100,32 +100,29 @@ This configuration creates the following GCP resources:
 
 ## Deploying Code Changes
 
-When you make changes to the Go code in `function/`, you need to rebuild and redeploy the container:
-
-### Option 1: Using Cloud Build
+When you make changes to the Go code in `function/`, deploy using source-based deployment:
 
 ```bash
-# Build and push the container
-gcloud builds submit ../function \
-  --tag us-east4-docker.pkg.dev/PROJECT_ID/github-repository-token-issuer/app:latest
-
-# Terraform will detect the new image on next apply
-terraform apply
+# From repository root
+gcloud beta run deploy gh-repo-token-issuer \
+  --source . \
+  --region=us-east4 \
+  --no-build \
+  --base-image=osonly24 \
+  --command=./function
 ```
 
-### Option 2: Local Build and Push
+For canary deployments (no traffic until verified):
 
 ```bash
-# Build locally
-cd ../function
-docker build -t us-east4-docker.pkg.dev/PROJECT_ID/github-repository-token-issuer/app:latest .
-
-# Push to Artifact Registry
-docker push us-east4-docker.pkg.dev/PROJECT_ID/github-repository-token-issuer/app:latest
-
-# Update Cloud Run service
-cd ../terraform
-terraform apply
+gcloud beta run deploy gh-repo-token-issuer \
+  --source . \
+  --region=us-east4 \
+  --no-build \
+  --base-image=osonly24 \
+  --command=./function \
+  --no-traffic \
+  --tag=commit-$(git rev-parse --short HEAD)
 ```
 
 ## Outputs

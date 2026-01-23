@@ -371,10 +371,10 @@ No logging is performed by the service to prevent accidental exposure of sensiti
 
 ### Build & Deployment
 
-- **Source-based deployment**: Service deployed via `gcloud run deploy --source`
-  - Cloud Build automatically builds from source using Buildpacks
+- **Source-based deployment**: Service deployed via `gcloud beta run deploy --source`
+  - Uses OS-only base image (`osonly24`) with pre-compiled Go binary
+  - No Cloud Build or Buildpacks required (`--no-build`)
   - Functions Framework handles HTTP server setup
-  - No Dockerfile required
 - **Infrastructure**: Terraform manages Cloud Run service, IAM, and supporting resources
   - Service image managed by gcloud, not Terraform (via `lifecycle.ignore_changes`)
 - **CI/CD**: GitHub Actions workflow (.github/workflows/deploy.yml)
@@ -388,7 +388,7 @@ No logging is performed by the service to prevent accidental exposure of sensiti
 **Single Endpoint**:
 
 ```
-POST https://github-repository-token-issuer-[hash]-[region].a.run.app/token
+POST https://gh-repo-token-issuer-[hash]-[region].a.run.app/token
 ```
 
 ### Query Parameters
@@ -431,7 +431,7 @@ The GitHub OIDC token serves as both the GCP IAM authentication token and the so
 ```bash
 curl -X POST \
   -H "Authorization: Bearer ${GITHUB_OIDC_TOKEN}" \
-  "https://github-repository-token-issuer-xyz.run.app/token?issues=write&pull_requests=read"
+  "https://gh-repo-token-issuer-xyz.run.app/token?issues=write&pull_requests=read"
 ```
 
 ### Response Format
@@ -540,8 +540,8 @@ The function authenticates as the GitHub App using JWT:
 
 1. Generate new GitHub App private key
 2. Update Secret Manager with new key
-3. Deploy new revision with `--no-traffic --tag=canary`
-4. Test via tagged URL (e.g., `https://canary---service-hash.a.run.app`)
+3. Deploy new revision with `--no-traffic --tag=commit-<SHA>`
+4. Test via tagged URL (e.g., `https://commit-abc1234---gh-repo-token-issuer-HASH.a.run.app`)
 5. Gradually shift traffic to new revision
 6. Revoke old private key on GitHub
 
@@ -595,7 +595,7 @@ All infrastructure defined in `terraform/main.tf`:
 
 1. **Cloud Run Service**
 
-- Name: `github-repository-token-issuer`
+- Name: `gh-repo-token-issuer`
 - Region: User-configurable (e.g., `us-east4`)
 - Image: Managed by gcloud (placeholder in Terraform)
 - Environment variables: `GITHUB_APP_ID`
@@ -766,7 +766,6 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    gcloud services enable run.googleapis.com
    gcloud services enable secretmanager.googleapis.com
    gcloud services enable iamcredentials.googleapis.com
-   gcloud services enable cloudbuild.googleapis.com
    ```
 
 3. **Store GitHub App Private Key**:
@@ -799,10 +798,12 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
 
 6. **Deploy Service Code**:
    ```bash
-   # Deploy from source (Buildpacks builds automatically)
-   gcloud run deploy github-repository-token-issuer \
-     --source=./function \
-     --region=us-east4
+   gcloud beta run deploy gh-repo-token-issuer \
+     --source . \
+     --region=us-east4 \
+     --no-build \
+     --base-image=osonly24 \
+     --command=./function
    ```
 
 ### Terraform Workflow
@@ -814,7 +815,7 @@ cd terraform
 terraform init
 
 # Plan changes
-terraform plan -var="github_app_id=123456" -var="project_id=my-project"
+terraform plan
 
 # Apply
 terraform apply
@@ -831,33 +832,38 @@ terraform apply
 
 **gcloud handles**:
 
-1. Building source code via Cloud Build (Buildpacks)
-2. Creating container image
-3. Deploying new revisions
+1. Deploying source code with OS-only base image
+2. Creating new revisions
 
 **Standard deployment**:
 
 ```bash
-gcloud run deploy github-repository-token-issuer \
-  --source=./function \
-  --region=us-east4
+gcloud beta run deploy gh-repo-token-issuer \
+  --source . \
+  --region=us-east4 \
+  --no-build \
+  --base-image=osonly24 \
+  --command=./function
 ```
 
 **Canary deployment** (with traffic control):
 
 ```bash
 # Deploy new revision without traffic
-gcloud run deploy github-repository-token-issuer \
-  --source=./function \
+gcloud beta run deploy gh-repo-token-issuer \
+  --source . \
   --region=us-east4 \
+  --no-build \
+  --base-image=osonly24 \
+  --command=./function \
   --no-traffic \
-  --tag=canary
+  --tag=commit-$(git rev-parse --short HEAD)
 
 # Test via tagged URL
-curl https://canary---github-repository-token-issuer-HASH.a.run.app/token
+curl https://commit-abc1234---gh-repo-token-issuer-HASH.a.run.app/token
 
 # Shift traffic when ready
-gcloud run services update-traffic github-repository-token-issuer \
+gcloud run services update-traffic gh-repo-token-issuer \
   --region=us-east4 \
   --to-latest
 ```
@@ -923,7 +929,7 @@ This will cause validation to reject `?my_scope=write` with 400 error.
 
 ```bash
 gcloud secrets add-iam-policy-binding github-app-private-key \
-  --member="serviceAccount:github-repository-token-issuer-sa@PROJECT_ID.iam.gserviceaccount.com" \
+  --member="serviceAccount:gh-repo-token-issuer-sa@PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/secretmanager.secretAccessor"
 ```
 

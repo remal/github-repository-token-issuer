@@ -23,7 +23,7 @@ provider "google" {
 resource "google_service_account" "cloud_run_sa" {
   account_id   = "gh-repo-token-issuer-sa"
   display_name = "GitHub Repository Token Issuer Service Account"
-  description  = "Service account for github-repository-token-issuer Cloud Run service"
+  description  = "Service account for gh-repo-token-issuer Cloud Run service"
 }
 
 # Grant Secret Manager access to service account
@@ -35,7 +35,7 @@ resource "google_secret_manager_secret_iam_member" "secret_accessor" {
 
 # Cloud Run service
 resource "google_cloud_run_v2_service" "github_token_issuer" {
-  name     = "github-repository-token-issuer"
+  name     = "gh-repo-token-issuer"
   location = var.region
 
   template {
@@ -49,7 +49,7 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
     }
 
     containers {
-      # Placeholder image - actual deployment via gcloud run deploy --source
+      # Placeholder image - actual deployment via gcloud beta run deploy --source
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       resources {

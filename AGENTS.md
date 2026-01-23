@@ -127,10 +127,10 @@ action.yml    # Composite action in root
 
 ## Deployment Approach
 
-- **Changes to function/**: Run `gcloud run deploy --source ./function` (Terraform ignores image changes)
+- **Changes to function/**: Run `gcloud beta run deploy gh-repo-token-issuer --source . --region=us-east4 --no-build --base-image=osonly24 --command=./function` (Terraform ignores image changes)
 - **Changes to terraform/**: Run `terraform validate`, then plan, then apply
 - **CI/CD**: Triggered on push to main, runs lint → terraform → gcloud deploy
-- **Canary deployments**: Use `--no-traffic --tag=canary` for safe rollouts
+- **Canary deployments**: Use `--no-traffic --tag=commit-$(git rev-parse --short HEAD)` for safe rollouts
 
 ## Scope Management
 
@@ -307,5 +307,5 @@ terraform/
 ## Version Information
 
 - **Go Version**: Always use 1.25+ or 1.25.* in documentation
-- **Cloud Run**: Source-based deployment using Buildpacks
+- **Cloud Run**: Source-based deployment using OS-only base image (no Buildpacks)
 - **Terraform**: Latest stable version
