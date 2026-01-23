@@ -45,6 +45,8 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
   location = var.region
 
   deletion_protection = false
+  provider            = google-beta
+  launch_stage        = "BETA"
 
   template {
     service_account = google_service_account.cloud_run_sa.email
@@ -82,6 +84,7 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
     ignore_changes = [
       template[0].containers[0].image,
       template[0].containers[0].base_image_uri,
+      template[0].containers[0].command,
       template[0].revision,
       client,
       client_version,
