@@ -122,6 +122,12 @@ jobs:
         GOARCH: amd64
       run: go build ./...
 
+    - name: Install gcloud SDK
+      uses: google-github-actions/setup-gcloud@v3
+      with:
+        project_id: github-repository-token-issuer
+        install_components: beta
+
     - name: Deploy
       working-directory: ./function
       run: |
