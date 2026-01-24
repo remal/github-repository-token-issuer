@@ -27,7 +27,7 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 
 ## Technology Stack
 
-- **Language**: Go 1.25+
+- **Language**: Go
 - **Platform**: Google Cloud Run
 - **IaC**: Terraform (single main.tf file, GCS backend with locking)
 - **CI/CD**: GitHub Actions (lint → terraform plan → gcloud deploy)
@@ -314,9 +314,3 @@ terraform/
 **Monitoring**: Intentionally omitted for simplicity - don't add unless explicitly requested
 
 **Performance**: Current design (no caching, fetch every request) is intentional for simplicity
-
-## Version Information
-
-- **Go Version**: Always use 1.25+ or 1.25.* in documentation
-- **Cloud Run**: Source-based deployment using OS-only base image (no Buildpacks)
-- **Terraform**: Latest stable version

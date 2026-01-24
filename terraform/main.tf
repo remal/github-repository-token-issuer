@@ -10,7 +10,7 @@ terraform {
 
   backend "gcs" {
     bucket = "gh-repo-token-issuer-terraform-state"
-    prefix = "gh-repo-token-issuer"
+    prefix = "default"
   }
 }
 
@@ -44,8 +44,6 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
   location = var.region
 
   deletion_protection = false
-  provider            = google-beta
-  launch_stage        = "BETA"
 
   template {
     service_account = google_service_account.cloud_run_sa.email

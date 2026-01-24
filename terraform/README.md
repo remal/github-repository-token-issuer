@@ -5,7 +5,7 @@ This directory contains the Terraform configuration for deploying the GitHub Rep
 ## Prerequisites
 
 1. **GCP Project** with billing enabled
-2. **Terraform** installed (>= 1.0)
+2. **Terraform** installed (see `.terraform-version` or `terraform/main.tf` for constraints)
 3. **gcloud CLI** installed and authenticated
 4. **GitHub App** created with repository permissions
 5. **GitHub App private key** stored in GCP Secret Manager

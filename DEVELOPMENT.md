@@ -355,7 +355,7 @@ No logging is performed by the service to prevent accidental exposure of sensiti
 
 ### Runtime Environment
 
-- **Language**: Go 1.25+
+- **Language**: Go
 - **Platform**: Google Cloud Run
 - **Scaling**:
   - Minimum instances: 0 (cost optimization)
@@ -652,8 +652,8 @@ No validation of Secret Manager connectivity or private key format at startup; f
 
 ### Prerequisites
 
-- Go 1.25+
-- Terraform (latest stable)
+- Go (see `function/go.mod` for version)
+- Terraform (see `.terraform-version` or `terraform/main.tf` for constraints)
 - gcloud CLI (for Secret Manager access)
 - GitHub App for testing
 
