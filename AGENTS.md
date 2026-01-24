@@ -61,6 +61,17 @@ action.yml    # Composite action in root
 - No emojis unless explicitly requested
 - Use GitHub-flavored markdown
 
+### Documentation Maintenance
+
+You MUST update documentation when code changes affect documented behavior. Before completing any code change, verify:
+
+- [ ] **README.md** updated (if usage, examples, variable defaults, or feature descriptions changed)
+- [ ] **DEVELOPMENT.md** updated (if architecture, implementation, local dev, deployment changed)
+- [ ] **AGENTS.md** updated (if variable design, coding patterns, or workflows changed)
+- [ ] **terraform.tfvars.example** updated
+
+Do not consider a task complete until documentation matches the current code.
+
 ## Security Rules (NEVER violate)
 
 1. **Repository permissions only** - Never add organization or account-level permissions
