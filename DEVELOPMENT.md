@@ -628,7 +628,7 @@ All infrastructure defined in `terraform/main.tf`:
   terraform {
     backend "gcs" {
       bucket = "your-terraform-state-bucket"
-      prefix = "github-repository-token-issuer"
+      prefix = "gh-repo-token-issuer"
     }
   }
   ```

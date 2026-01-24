@@ -1,7 +1,7 @@
 variable "project_id" {
   description = "The GCP project ID"
   type        = string
-  default     = "github-repository-token-issuer"
+  default     = "gh-repo-token-issuer"
 }
 
 variable "region" {

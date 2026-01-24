@@ -39,7 +39,7 @@ Update the GCS bucket name in `main.tf`:
 ```hcl
 backend "gcs" {
   bucket = "your-terraform-state-bucket"  # Change this to your bucket
-  prefix = "github-repository-token-issuer"
+  prefix = "gh-repo-token-issuer"
 }
 ```
 

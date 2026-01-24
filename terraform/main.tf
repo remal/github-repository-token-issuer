@@ -9,8 +9,8 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "github-repository-token-issuer-terraform-state"
-    prefix = "github-repository-token-issuer"
+    bucket = "gh-repo-token-issuer-terraform-state"
+    prefix = "gh-repo-token-issuer"
   }
 }
 
@@ -40,8 +40,7 @@ resource "google_secret_manager_secret_iam_member" "secret_accessor" {
 
 # Cloud Run service
 resource "google_cloud_run_v2_service" "github_token_issuer" {
-  name = "github-repository-token-issuer"
-  # name     = "gh-repo-token-issuer"
+  name     = "gh-repo-token-issuer"
   location = var.region
 
   deletion_protection = false
@@ -82,10 +81,10 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
   # Deployments are managed by gcloud, not Terraform
   lifecycle {
     ignore_changes = [
+      template[0],
       template[0].containers[0].image,
       template[0].containers[0].base_image_uri,
       template[0].containers[0].command,
-      template[0],
       template[0].revision,
       client,
       client_version,
