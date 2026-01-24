@@ -110,29 +110,32 @@ jobs:
       working-directory: ./terraform
       run: terraform apply -auto-approve
 
-    - name: Go - Setup
-      uses: actions/setup-go@v6
-      with:
-        go-version: '1.25'
-        cache-dependency-path: function/go.sum
-    - name: Go - Build
-      working-directory: ./function
-      env:
-        GOOS: linux
-        GOARCH: amd64
-      run: go build ./...
-
     - name: Install gcloud SDK
       uses: google-github-actions/setup-gcloud@v3
-      with:
-        project_id: 74155037973
 
-    - name: Deploy
+    - name: Configure Docker for Artifact Registry
+      run: gcloud auth configure-docker us-east4-docker.pkg.dev --quiet
+
+    - name: Build Docker image
+      if: ${{github.ref == 'refs/heads/main'}}
       working-directory: ./function
       run: |
-        echo "::group::gcloud info"
-        gcloud info
-        echo "::endgroup::"
         SHORT_SHA=$(git rev-parse --short HEAD)
-        echo "SHORT_SHA=$SHORT_SHA
+        docker build \
+          -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
+          -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:latest \
+          .
+
+    - name: Push Docker image
+      if: ${{github.ref == 'refs/heads/main'}}
+      run: |
+        docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function --all-tags
+
+    - name: Deploy to Cloud Run
+      if: ${{github.ref == 'refs/heads/main'}}
+      run: |
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        gcloud run deploy gh-repo-token-issuer \
+          --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
+          --region=us-east4
 

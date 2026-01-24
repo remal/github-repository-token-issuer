@@ -70,7 +70,7 @@ You MUST update documentation when code changes affect documented behavior. Befo
 - [ ] **AGENTS.md** updated (if variable design, coding patterns, or workflows changed)
 - [ ] **terraform.tfvars.example** updated
 
-Do not consider a task complete until documentation matches the current code.
+Check for these files both at the repository root and in affected subdirectories. Do not consider a task complete until documentation matches the current code.
 
 ## Security Rules (NEVER violate)
 
@@ -138,9 +138,16 @@ Do not consider a task complete until documentation matches the current code.
 
 ## Deployment Approach
 
-- **Changes to function/**: Run `gcloud beta run deploy gh-repo-token-issuer --source . --region=us-east4 --no-build --base-image=osonly24 --command=./function` (Terraform ignores image changes)
+- **Image Registry**: Artifact Registry at `us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer`
+- **Changes to function/**: Build and push Docker image, then deploy to Cloud Run:
+  ```bash
+  SHORT_SHA=$(git rev-parse --short HEAD)
+  docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} function/
+  docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
+  gcloud run deploy gh-repo-token-issuer --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} --region=us-east4
+  ```
 - **Changes to terraform/**: Run `terraform validate`, then plan, then apply
-- **CI/CD**: Triggered on push to main, runs lint → terraform → gcloud deploy
+- **CI/CD**: Triggered on push to main, runs lint → terraform apply → docker build/push → gcloud deploy
 - **Canary deployments**: Use `--no-traffic --tag=commit-$(git rev-parse --short HEAD)` for safe rollouts
 
 ## Scope Management
@@ -289,6 +296,7 @@ scopes[param] = permission
 
 ```
 function/
+├── Dockerfile     # Multi-stage build for Cloud Run
 ├── main.go        # Functions Framework entry point, startup validation
 ├── handlers.go    # TokenHandler, query param parsing, response formatting
 ├── validation.go  # ValidateScopes, ExtractRepositoryFromOIDC, duplicate detection

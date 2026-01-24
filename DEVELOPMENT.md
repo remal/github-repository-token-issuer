@@ -371,15 +371,17 @@ No logging is performed by the service to prevent accidental exposure of sensiti
 
 ### Build & Deployment
 
-- **Source-based deployment**: Service deployed via `gcloud beta run deploy --source`
-  - Uses OS-only base image (`osonly24`) with pre-compiled Go binary
-  - No Cloud Build or Buildpacks required (`--no-build`)
+- **Docker-based deployment**: Service deployed via Docker image to Artifact Registry
+  - Multi-stage Dockerfile in `function/Dockerfile`
+  - Build stage: `golang:1.25-alpine` compiles the binary
+  - Runtime stage: `gcr.io/distroless/static-debian12:nonroot` for minimal footprint
   - Functions Framework handles HTTP server setup
-- **Infrastructure**: Terraform manages Cloud Run service, IAM, and supporting resources
-  - Service image managed by gcloud, not Terraform (via `lifecycle.ignore_changes`)
-- **CI/CD**: GitHub Actions workflow (.github/workflows/deploy.yml)
+- **Image Registry**: Artifact Registry at `us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer`
+- **Infrastructure**: Terraform manages Cloud Run service, Artifact Registry, IAM, and supporting resources
+  - Service image managed by CI/CD, not Terraform (via `lifecycle.ignore_changes`)
+- **CI/CD**: GitHub Actions workflow (.github/workflows/build.yml)
   - Triggered on push to main branch
-  - Steps: Lint → Terraform plan → gcloud deploy
+  - Steps: Lint → Terraform apply → Docker build/push → gcloud deploy
 
 ## API Reference
 
@@ -761,12 +763,9 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    ```bash
    # Set GCP project
    gcloud config set project YOUR_PROJECT_ID
-
-   # Enable required APIs
-   gcloud services enable run.googleapis.com
-   gcloud services enable secretmanager.googleapis.com
-   gcloud services enable iamcredentials.googleapis.com
    ```
+
+   Required APIs (`run.googleapis.com`, `secretmanager.googleapis.com`, `iamcredentials.googleapis.com`) are enabled automatically by Terraform.
 
 3. **Store GitHub App Private Key**:
    ```bash

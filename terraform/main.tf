@@ -19,6 +19,45 @@ provider "google" {
   region  = var.region
 }
 
+# Enable required GCP services
+resource "google_project_service" "run" {
+  service            = "run.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "secretmanager" {
+  service            = "secretmanager.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "iamcredentials" {
+  service            = "iamcredentials.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "artifactregistry" {
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
+}
+
+# Artifact Registry repository for Docker images
+resource "google_artifact_registry_repository" "docker" {
+  repository_id = "gh-repo-token-issuer"
+  location      = var.region
+  format        = "DOCKER"
+  description   = "Docker images for GitHub Repository Token Issuer"
+
+  depends_on = [google_project_service.artifactregistry]
+}
+
+# Grant CI/CD service account permission to push images
+resource "google_artifact_registry_repository_iam_member" "cicd_writer" {
+  repository = google_artifact_registry_repository.docker.name
+  location   = google_artifact_registry_repository.docker.location
+  role       = "roles/artifactregistry.writer"
+  member     = "serviceAccount:${var.cicd_service_account}"
+}
+
 # Data source to get project number
 data "google_project" "project" {
   project_id = var.project_id
@@ -36,6 +75,8 @@ resource "google_secret_manager_secret_iam_member" "secret_accessor" {
   secret_id = "github-app-private-key"
   role      = "roles/secretmanager.secretAccessor"
   member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+
+  depends_on = [google_project_service.secretmanager]
 }
 
 # Cloud Run service
@@ -44,6 +85,8 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
   location = var.region
 
   deletion_protection = false
+
+  depends_on = [google_project_service.run, google_artifact_registry_repository.docker]
 
   template {
     service_account = google_service_account.cloud_run_sa.email
@@ -56,7 +99,7 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
     }
 
     containers {
-      # Placeholder image - actual deployment via gcloud beta run deploy --source
+      # Placeholder image - actual deployment via CI/CD pipeline to Artifact Registry
       image = "us-docker.pkg.dev/cloudrun/container/hello"
 
       resources {
@@ -106,6 +149,8 @@ resource "google_iam_workload_identity_pool" "github_actions" {
   workload_identity_pool_id = "github-actions"
   display_name              = "GitHub Actions"
   description               = "Workload Identity Pool for GitHub Actions OIDC"
+
+  depends_on = [google_project_service.iamcredentials]
 }
 
 # Workload Identity Pool Provider for GitHub
