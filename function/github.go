@@ -108,7 +108,7 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 		return 0, fmt.Errorf("failed to find installation: %w", err)
 	}
 
-	if installation.ID == nil {
+	if installation == nil || installation.ID == nil {
 		return 0, fmt.Errorf("installation ID is nil for repository %s", repository)
 	}
 
@@ -120,7 +120,9 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 	// Build permissions map
 	permissions := &github.InstallationPermissions{}
 
-	// Use reflection-free approach: map scope IDs to struct fields
+	// IMPORTANT: When adding a new scope to AllowedScopes in scopes.go, you must also
+	// add a corresponding case in this switch statement and in VerifyRequestedScopes below.
+	// Failure to do so will cause runtime errors for the new scope.
 	for scopeID, permission := range scopes {
 		permValue := github.Ptr(permission)
 

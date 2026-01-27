@@ -32,6 +32,7 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 1. **Stateless** - No database or persistent storage, all validation happens per-request
 2. **Fail Fast** - Errors are returned immediately without retries to keep logic simple
 3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request to avoid stale data
+   - *Exception*: GitHub's JWKS (public signing keys) is cached for 1 hour to reduce latency. This is safe because GitHub rarely rotates these keys.
 4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
 
 ### Architecture Diagram
@@ -746,7 +747,7 @@ go run .
 
 curl -X POST \
   -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
-  "http://localhost:8080/TokenHandler?contents=write&deployments=write"
+  "http://localhost:8080/token?contents=write&deployments=write"
 ```
 
 Note: When running locally, Cloud Run's GCP IAM layer is bypassed, so only the `X-GitHub-Token` header is needed.

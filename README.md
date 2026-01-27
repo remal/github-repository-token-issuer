@@ -190,7 +190,7 @@ The following repository permission scopes are allowed (use the Scope ID in your
 ├── action.yml                 # Composite GitHub Action
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml         # CI/CD deployment workflow
+│       └── build.yml          # CI/CD deployment workflow
 ├── AGENTS.md                  # AI agent development guidelines
 ├── CLAUDE.md                  # Claude development entry point
 ├── DEVELOPMENT.md             # Technical implementation details

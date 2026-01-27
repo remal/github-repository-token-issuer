@@ -57,7 +57,7 @@ action.yml    # Composite action in root
 
 - **README.md**: User-facing only (overview, usage, error codes, repo structure)
 - **DEVELOPMENT.md**: Technical details (architecture, implementation, local dev, deployment)
-- **AGENTS.md**: AI agent development guidelines (this file)
+- **CLAUDE.md**: AI agent development guidelines (this file)
 - Keep Table of Contents updated in README.md and DEVELOPMENT.md
 - No emojis unless explicitly requested
 - Use GitHub-flavored markdown
@@ -78,9 +78,7 @@ Check for these files both at the repository root and in affected subdirectories
 1. **Repository permissions only** - Never add organization or account-level permissions
 2. **Read-only security scopes** - These must stay read-only:
 
-- `code_scanning`
-- `dependabot_alerts`
-- `security_advisories`
+- `administration`
 - `secret_scanning`
 
 3. **No logging** of:
@@ -157,7 +155,7 @@ Check for these files both at the repository root and in affected subdirectories
 
 **Allowlist** (in `function/scopes.go`):
 
-- 25 repository permission scopes
+- 19 repository permission scopes
 - Map of scope_id → []string{"read", "write"} or []string{"read"}
 - Security scopes are read-only
 
@@ -259,9 +257,13 @@ X-GitHub-Token: <GITHUB_OIDC_TOKEN>
 
 ### OIDC Token Handling
 
-- **GCP IAM validates** signature, issuer, audience, expiration
-- **Function extracts** repository claim only
-- **No additional verification** needed in function code
+- **GCP IAM validates** the GCP access token (obtained via Workload Identity Federation)
+- **Function validates** the GitHub OIDC token from X-GitHub-Token header:
+  - Signature against GitHub's JWKS
+  - Issuer (`https://token.actions.githubusercontent.com`)
+  - Audience (`gh-repo-token-issuer`)
+  - Expiration
+- **Function extracts** repository claim from validated OIDC token
 
 ### Scope Parsing
 
