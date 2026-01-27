@@ -39,6 +39,23 @@ jobs:
         workload_identity_provider: projects/74155037973/locations/global/workloadIdentityPools/github-pool/providers/remal-gh-repo-token-issuer
         service_account: gh-remal-gh-repo-token-issuer@gh-repo-token-issuer.iam.gserviceaccount.com
 
+    - name: Terraform - Read version
+      id: terraform-version
+      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+    - name: Terraform - Setup
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{steps.terraform-version.outputs.version}}
+    - name: Terraform - Init
+      working-directory: ./terraform
+      run: terraform init
+    - name: Terraform - Validate
+      working-directory: ./terraform
+      run: terraform validate
+    - name: Terraform - Plan
+      working-directory: ./terraform
+      run: terraform plan
+
     - name: Go - Setup
       uses: actions/setup-go@v6
       with:
@@ -59,23 +76,6 @@ jobs:
       run: go test -v ./...
       env:
         GITHUB_APP_ID: "1"
-
-    - name: Terraform - Read version
-      id: terraform-version
-      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
-    - name: Terraform - Setup
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: ${{steps.terraform-version.outputs.version}}
-    - name: Terraform - Init
-      working-directory: ./terraform
-      run: terraform init
-    - name: Terraform - Validate
-      working-directory: ./terraform
-      run: terraform validate
-    - name: Terraform - Plan
-      working-directory: ./terraform
-      run: terraform plan
 
   deploy:
     needs:
