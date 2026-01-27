@@ -115,24 +115,28 @@ The service requires two forms of authentication:
 2. **GitHub OIDC token** in `X-GitHub-Token` header (for repository identification)
 
 ```bash
-# 1. Authenticate to GCP via Workload Identity Federation
-# This is typically done via google-github-actions/auth in workflows
-
-# 2. Get GCP identity token for Cloud Run
-GCP_ID_TOKEN=$(gcloud auth print-identity-token --audiences="https://gh-repo-token-issuer-xyz.run.app/token")
-
-# 3. Obtain GitHub OIDC token
+# 1. Obtain GitHub OIDC token
+# The audience must match the oidc_audience configured in Workload Identity Pool Provider
 GITHUB_OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
   "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r .value)
 
-# 4. Call the function with both tokens
+# 2. Exchange GitHub OIDC token for GCP access token via STS API
+GCP_ACCESS_TOKEN=$(curl -sS -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+  --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+  --data-urlencode "subject_token=${GITHUB_OIDC_TOKEN}" \
+  --data-urlencode "audience=//iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/users-github-actions/providers/users-github-oidc" \
+  "https://sts.googleapis.com/v1/token" | jq -r .access_token)
+
+# 3. Call the function with both tokens
 curl -X POST \
-  -H "Authorization: Bearer ${GCP_ID_TOKEN}" \
+  -H "Authorization: Bearer ${GCP_ACCESS_TOKEN}" \
   -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
   "https://gh-repo-token-issuer-xyz.run.app/token?contents=write&deployments=write&statuses=write"
 ```
 
-**Note**: The `audience` value for the GitHub OIDC token must match the `oidc_audience` Terraform variable configured for the Workload Identity Pool Provider.
+**Note**: Replace `<PROJECT_NUMBER>` with your GCP project number. The `audience` value for the GitHub OIDC token must match the `oidc_audience` Terraform variable.
 
 ### Allowed Repository Permission Scopes
 

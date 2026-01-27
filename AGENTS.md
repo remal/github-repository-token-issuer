@@ -223,7 +223,7 @@ Standard status codes: 400, 401, 403, 500, 503 (see DEVELOPMENT.md for mappings)
 **Headers**:
 
 ```
-Authorization: Bearer <GCP_ID_TOKEN>
+Authorization: Bearer <GCP_ACCESS_TOKEN>
 X-GitHub-Token: <GITHUB_OIDC_TOKEN>
 ```
 

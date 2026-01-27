@@ -40,12 +40,11 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 ┌──────────────────────────────────────────────────────────────┐
 │ GitHub Actions Workflow                                      │
 │                                                              │
-│  1. Authenticate to GCP via Workload Identity Federation     │
-│  2. Obtain GCP identity token for Cloud Run                  │
-│  3. Obtain GitHub OIDC token                                 │
-│  4. Call Cloud Run with both tokens:                         │
+│  1. Obtain GitHub OIDC token                                 │
+│  2. Exchange OIDC token for GCP access token via STS API     │
+│  3. Call Cloud Run with both tokens:                         │
 │     POST /token?contents=write&deployments=write             │
-│     Authorization: Bearer <GCP_ID_TOKEN>                     │
+│     Authorization: Bearer <GCP_ACCESS_TOKEN>                 │
 │     X-GitHub-Token: <GITHUB_OIDC_TOKEN>                      │
 └─────────────────────┬────────────────────────────────────────┘
                       │
@@ -53,7 +52,7 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 ┌──────────────────────────────────────────────────────────────┐
 │ GCP Cloud Run (Go)                                           │
 │                                                              │
-│  1. GCP IAM validates GCP identity token                     │
+│  1. GCP IAM validates GCP access token                       │
 │  2. Validate GitHub OIDC token (signature, issuer, audience) │
 │  3. Extract repository claim from OIDC token                 │
 │  4. Parse scope query parameters                             │
@@ -78,15 +77,15 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 
 ```
 1. GitHub Actions Workflow
-   └─> Authenticates to GCP via Workload Identity Federation
-   └─> Obtains GCP identity token for Cloud Run URL
    └─> Obtains GitHub OIDC token via ACTIONS_ID_TOKEN_REQUEST_URL
-   └─> Calls Cloud Run with GCP token in Authorization header
+       (with audience matching Workload Identity Pool Provider)
+   └─> Exchanges GitHub OIDC token for GCP access token via STS API
+   └─> Calls Cloud Run with GCP access token in Authorization header
        and GitHub OIDC token in X-GitHub-Token header
 
 2. Cloud Run IAM Layer
-   └─> Validates GCP identity token
-   └─> Checks caller has roles/run.invoker permission
+   └─> Validates GCP access token
+   └─> Checks caller (Workload Identity principal) has roles/run.invoker
    └─> Allows request through if valid
 
 3. Function Handler (handlers.go)
@@ -117,10 +116,10 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 
 **Request Flow Summary**:
 
-1. GitHub Actions Workflow authenticates to GCP via Workload Identity Federation
-2. Workflow obtains GCP identity token and GitHub OIDC token
+1. GitHub Actions Workflow obtains GitHub OIDC token
+2. Workflow exchanges GitHub OIDC token for GCP access token via STS API
 3. Workflow calls Cloud Run with both tokens
-4. GCP IAM validates GCP identity token for Cloud Run invocation
+4. GCP IAM validates GCP access token for Cloud Run invocation
 5. Service validates GitHub OIDC token (signature, issuer, audience, expiration)
 6. Service extracts repository from validated OIDC claims
 7. Service parses scope permissions from query parameters
@@ -439,21 +438,32 @@ Scopes are specified as query parameters where the parameter name is the **repos
 ### Request Headers
 
 ```
-Authorization: Bearer <GCP_ID_TOKEN>
+Authorization: Bearer <GCP_ACCESS_TOKEN>
 X-GitHub-Token: <GITHUB_OIDC_TOKEN>
 ```
 
-- **Authorization**: GCP identity token for Cloud Run authentication (obtained via Workload Identity Federation)
+- **Authorization**: GCP access token for Cloud Run authentication (obtained via STS token exchange)
 - **X-GitHub-Token**: GitHub OIDC token for repository identification and authorization
 
 ### Request Example
 
 ```bash
-# Requires prior authentication to GCP via Workload Identity Federation
-GCP_ID_TOKEN=$(gcloud auth print-identity-token --audiences="https://gh-repo-token-issuer-xyz.run.app/token")
+# Step 1: Get GitHub OIDC token
+GITHUB_OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r .value)
 
+# Step 2: Exchange for GCP access token via STS
+GCP_ACCESS_TOKEN=$(curl -sS -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
+  --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
+  --data-urlencode "subject_token=${GITHUB_OIDC_TOKEN}" \
+  --data-urlencode "audience=//iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/users-github-actions/providers/users-github-oidc" \
+  "https://sts.googleapis.com/v1/token" | jq -r .access_token)
+
+# Step 3: Call Cloud Run
 curl -X POST \
-  -H "Authorization: Bearer ${GCP_ID_TOKEN}" \
+  -H "Authorization: Bearer ${GCP_ACCESS_TOKEN}" \
   -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
   "https://gh-repo-token-issuer-xyz.run.app/token?issues=write&pull_requests=read"
 ```
@@ -519,15 +529,23 @@ curl -X POST \
 
 **Two-Token Authentication**:
 
-1. **GCP Identity Token** (Authorization header):
-   - Obtained via Workload Identity Federation
+1. **GCP Access Token** (Authorization header):
+   - Obtained by exchanging GitHub OIDC token via GCP STS API
    - Authenticates the caller to Cloud Run
-   - GCP IAM validates this token
+   - GCP IAM validates this token against Workload Identity Pool
 
 2. **GitHub OIDC Token** (X-GitHub-Token header):
    - Identifies the calling repository
    - Function validates signature against GitHub's JWKS
    - Function validates issuer, audience, and expiration
+
+**Token Exchange Flow**:
+
+```
+GitHub OIDC Token --[STS API]--> GCP Access Token --[Cloud Run]--> Service
+                                                          |
+                        GitHub OIDC Token ----[X-GitHub-Token header]----┘
+```
 
 ### Required OIDC Claims
 
