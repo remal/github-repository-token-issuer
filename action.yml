@@ -5,6 +5,10 @@ inputs:
   scopes:
     description: 'Repository permission scopes (one per line, format: scope_id:permission)'
     required: true
+  service_tag:
+    description: 'Cloud Run service tag for canary deployments (e.g., "canary"). When set, uses the tag-specific URL.'
+    required: false
+    default: ''
 
 outputs:
   token:
@@ -14,6 +18,17 @@ outputs:
 runs:
   using: 'composite'
   steps:
+    - name: Check dependencies
+      shell: bash
+      run: |
+        missing=()
+        command -v curl &>/dev/null || missing+=("curl")
+        command -v jq &>/dev/null || missing+=("jq")
+        if [[ ${#missing[@]} -gt 0 ]]; then
+          echo "Error: Missing required dependencies: ${missing[*]}"
+          exit 1
+        fi
+
     - name: Get GitHub OIDC Token
       id: oidc
       shell: bash
@@ -55,10 +70,15 @@ runs:
       id: get-token
       shell: bash
       run: |
+        if [[ -n "${{ inputs.service_tag }}" ]]; then
+          SERVICE_URL="https://${{ inputs.service_tag }}---gh-repo-token-issuer-db7udto7gq-uk.a.run.app"
+        else
+          SERVICE_URL="https://gh-repo-token-issuer-db7udto7gq-uk.a.run.app"
+        fi
         RESPONSE=$(curl -sS -X POST \
           -H "Authorization: Bearer ${{ steps.gcp.outputs.token }}" \
           -H "X-GitHub-Token: ${{ steps.oidc.outputs.token }}" \
-          "https://gh-repo-token-issuer-db7udto7gq-uk.a.run.app/token?${{ steps.scopes.outputs.query }}")
+          "${SERVICE_URL}/token?${{ steps.scopes.outputs.query }}")
         TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty')
         if [[ -z "$TOKEN" ]]; then
           echo "Error: $(echo "$RESPONSE" | jq -r '.error // "Unknown error"')"
