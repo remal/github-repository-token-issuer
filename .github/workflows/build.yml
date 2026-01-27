@@ -189,6 +189,7 @@ jobs:
         fi
 
     - name: Migrate traffic to new revision
+      if: ${{github.ref == 'refs/heads/main'}}
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
         gcloud run services update-traffic gh-repo-token-issuer \
