@@ -47,15 +47,28 @@ resource "google_artifact_registry_repository" "docker" {
   format        = "DOCKER"
   description   = "Docker images for GitHub Repository Token Issuer"
 
-  depends_on = [google_project_service.artifactregistry]
-}
+  cleanup_policy_dry_run = false
 
-# Grant CI/CD service account permission to push images
-resource "google_artifact_registry_repository_iam_member" "cicd_writer" {
-  repository = google_artifact_registry_repository.docker.name
-  location   = google_artifact_registry_repository.docker.location
-  role       = "roles/artifactregistry.writer"
-  member     = "serviceAccount:${var.cicd_service_account}"
+  # Remove untagged images
+  cleanup_policies {
+    id     = "delete-untagged"
+    action = "DELETE"
+    condition {
+      tag_state = "UNTAGGED"
+    }
+  }
+
+  # Remove images older than 1 hour
+  cleanup_policies {
+    id     = "delete-old-images"
+    action = "DELETE"
+    condition {
+      tag_state  = "ANY"
+      older_than = "3600s"
+    }
+  }
+
+  depends_on = [google_project_service.artifactregistry]
 }
 
 # Data source to get project number

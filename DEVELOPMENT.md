@@ -372,16 +372,15 @@ No logging is performed by the service to prevent accidental exposure of sensiti
 ### Build & Deployment
 
 - **Docker-based deployment**: Service deployed via Docker image to Artifact Registry
-  - Multi-stage Dockerfile in `function/Dockerfile`
-  - Build stage: `golang:1.25-alpine` compiles the binary
-  - Runtime stage: `gcr.io/distroless/static-debian12:nonroot` for minimal footprint
+  - Go binary built in CI/CD with `CGO_ENABLED=0 GOOS=linux GOARCH=amd64`
+  - Minimal Dockerfile copies pre-built binary into `gcr.io/distroless/static-debian12:nonroot`
   - Functions Framework handles HTTP server setup
 - **Image Registry**: Artifact Registry at `us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer`
 - **Infrastructure**: Terraform manages Cloud Run service, Artifact Registry, IAM, and supporting resources
   - Service image managed by CI/CD, not Terraform (via `lifecycle.ignore_changes`)
 - **CI/CD**: GitHub Actions workflow (.github/workflows/build.yml)
   - Triggered on push to main branch
-  - Steps: Lint → Terraform apply → Docker build/push → gcloud deploy
+  - Steps: Lint → Terraform apply → Go build → Docker build/push → Cloud Run deploy
 
 ## API Reference
 
@@ -795,14 +794,25 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    terraform apply
    ```
 
-6. **Deploy Service Code**:
+6. **Build and Deploy Service Code**:
    ```bash
-   gcloud beta run deploy gh-repo-token-issuer \
-     --source . \
-     --region=us-east4 \
-     --no-build \
-     --base-image=osonly24 \
-     --command=./function
+   cd function
+
+   # Build Go binary for Linux
+   CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o function .
+
+   # Configure Docker for Artifact Registry
+   gcloud auth configure-docker us-east4-docker.pkg.dev --quiet
+
+   # Build and push Docker image
+   SHORT_SHA=$(git rev-parse --short HEAD)
+   docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} .
+   docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
+
+   # Deploy to Cloud Run
+   gcloud run deploy gh-repo-token-issuer \
+     --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
+     --region=us-east4
    ```
 
 ### Terraform Workflow
@@ -825,38 +835,45 @@ terraform apply
 **Terraform handles**:
 
 1. Creating Cloud Run service with placeholder image
-2. Configuring environment variables
-3. Setting up IAM bindings for OIDC
-4. Managing service account permissions
+2. Creating Artifact Registry repository
+3. Configuring environment variables
+4. Setting up IAM bindings for OIDC
+5. Managing service account permissions
 
-**gcloud handles**:
+**CI/CD handles**:
 
-1. Deploying source code with OS-only base image
-2. Creating new revisions
+1. Building Go binary for Linux
+2. Building and pushing Docker image to Artifact Registry
+3. Deploying new Cloud Run revision
 
 **Standard deployment**:
 
 ```bash
-gcloud beta run deploy gh-repo-token-issuer \
-  --source . \
-  --region=us-east4 \
-  --no-build \
-  --base-image=osonly24 \
-  --command=./function
+cd function
+
+# Build Go binary
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o function .
+
+# Build and push Docker image
+SHORT_SHA=$(git rev-parse --short HEAD)
+docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} .
+docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
+
+# Deploy to Cloud Run
+gcloud run deploy gh-repo-token-issuer \
+  --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
+  --region=us-east4
 ```
 
 **Canary deployment** (with traffic control):
 
 ```bash
 # Deploy new revision without traffic
-gcloud beta run deploy gh-repo-token-issuer \
-  --source . \
+gcloud run deploy gh-repo-token-issuer \
+  --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
   --region=us-east4 \
-  --no-build \
-  --base-image=osonly24 \
-  --command=./function \
   --no-traffic \
-  --tag=commit-$(git rev-parse --short HEAD)
+  --tag=commit-${SHORT_SHA}
 
 # Test via tagged URL
 curl https://commit-abc1234---gh-repo-token-issuer-HASH.a.run.app/token
@@ -869,13 +886,15 @@ gcloud run services update-traffic gh-repo-token-issuer \
 
 ### CI/CD Pipeline
 
-**GitHub Actions workflow** (`.github/workflows/deploy.yml`):
+**GitHub Actions workflow** (`.github/workflows/build.yml`):
 
 1. **Lint**: Run `golangci-lint` on `function/`
 2. **Build**: Compile Go binary to verify build works
 3. **Terraform Plan**: Show infrastructure changes
-4. **Terraform Apply**: Apply infrastructure changes
-5. **Deploy**: Run `gcloud run deploy --source` for code changes
+4. **Terraform Apply**: Apply infrastructure changes (main branch only)
+5. **Go Build**: Build Linux binary with `CGO_ENABLED=0`
+6. **Docker Build/Push**: Build image and push to Artifact Registry
+7. **Deploy**: Deploy new revision to Cloud Run
 
 **Triggered on**: Push to `main` branch
 

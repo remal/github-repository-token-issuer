@@ -139,15 +139,17 @@ Check for these files both at the repository root and in affected subdirectories
 ## Deployment Approach
 
 - **Image Registry**: Artifact Registry at `us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer`
-- **Changes to function/**: Build and push Docker image, then deploy to Cloud Run:
+- **Changes to function/**: Build Go binary, create Docker image, push to Artifact Registry, deploy to Cloud Run:
   ```bash
+  cd function
+  CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o function .
   SHORT_SHA=$(git rev-parse --short HEAD)
-  docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} function/
+  docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} .
   docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
   gcloud run deploy gh-repo-token-issuer --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} --region=us-east4
   ```
 - **Changes to terraform/**: Run `terraform validate`, then plan, then apply
-- **CI/CD**: Triggered on push to main, runs lint → terraform apply → docker build/push → gcloud deploy
+- **CI/CD**: Triggered on push to main, runs lint → terraform apply → go build → docker build/push → gcloud deploy
 - **Canary deployments**: Use `--no-traffic --tag=commit-$(git rev-parse --short HEAD)` for safe rollouts
 
 ## Scope Management
