@@ -113,13 +113,15 @@ jobs:
 ```bash
 # Obtain OIDC token from GitHub Actions
 OIDC_TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://gh-repo-token-issuer-xyz.run.app" | jq -r .value)
+  "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r .value)
 
 # Call the function with repository permission scopes
 curl -X POST \
   -H "Authorization: Bearer ${OIDC_TOKEN}" \
   "https://gh-repo-token-issuer-xyz.run.app/token?contents=write&deployments=write&statuses=write"
 ```
+
+**Note**: The `audience` value must match the `oidc_audience` Terraform variable configured for the Workload Identity Pool Provider.
 
 ### Allowed Repository Permission Scopes
 

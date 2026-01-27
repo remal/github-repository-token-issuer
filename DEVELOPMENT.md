@@ -881,8 +881,10 @@ curl https://commit-abc1234---gh-repo-token-issuer-HASH.a.run.app/token
 # Shift traffic when ready
 gcloud run services update-traffic gh-repo-token-issuer \
   --region=us-east4 \
-  --to-latest
+  --to-tags=commit-${SHORT_SHA}=100
 ```
+
+**Note**: CI/CD performs automated canary validation by requesting a token with `contents=write` scope and verifying `X-OAuth-Scopes` header via GitHub API before migrating traffic.
 
 ### CI/CD Pipeline
 
@@ -894,7 +896,9 @@ gcloud run services update-traffic gh-repo-token-issuer \
 4. **Terraform Apply**: Apply infrastructure changes (main branch only)
 5. **Go Build**: Build Linux binary with `CGO_ENABLED=0`
 6. **Docker Build/Push**: Build image and push to Artifact Registry
-7. **Deploy**: Deploy new revision to Cloud Run
+7. **Deploy (no traffic)**: Deploy new revision with `--no-traffic --tag=commit-<SHA>`
+8. **Validate**: Request token from canary, verify `X-OAuth-Scopes` via GitHub API
+9. **Migrate traffic**: Route 100% traffic to new revision if validation passes
 
 **Triggered on**: Push to `main` branch
 
