@@ -15,3 +15,9 @@ variable "github_app_id" {
   type        = string
   default     = "2637135"
 }
+
+variable "workload_identity_additional_condition" {
+  description = "Optional additional CEL expression to append to attribute condition (e.g., \"attribute.repository.startsWith('myorg/')\")"
+  type        = string
+  default     = "attribute.repository.startsWith('remal/')"
+}

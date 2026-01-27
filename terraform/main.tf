@@ -185,5 +185,5 @@ resource "google_iam_workload_identity_pool_provider" "github" {
   }
 
   # Require valid repository claim - authorization handled by the service
-  attribute_condition = "attribute.repository != ''"
+  attribute_condition = var.workload_identity_additional_condition != "" ? "attribute.repository != '' && (${var.workload_identity_additional_condition})" : "attribute.repository != ''"
 }
