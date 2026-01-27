@@ -157,11 +157,11 @@ resource "google_cloud_run_v2_service_iam_member" "github_oidc_invoker" {
   member   = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github_actions.workload_identity_pool_id}/*"
 }
 
-# Workload Identity Pool for GitHub Actions
+# Workload Identity Pool for GitHub Actions (users of this service)
 resource "google_iam_workload_identity_pool" "github_actions" {
-  workload_identity_pool_id = "github-actions"
-  display_name              = "GitHub Actions"
-  description               = "Workload Identity Pool for GitHub Actions OIDC"
+  workload_identity_pool_id = "users-github-actions"
+  display_name              = "Users - GitHub Actions"
+  description               = "Workload Identity Pool for GitHub Actions OIDC (service users)"
 
   depends_on = [google_project_service.iamcredentials]
 }
@@ -169,9 +169,9 @@ resource "google_iam_workload_identity_pool" "github_actions" {
 # Workload Identity Pool Provider for GitHub
 resource "google_iam_workload_identity_pool_provider" "github" {
   workload_identity_pool_id          = google_iam_workload_identity_pool.github_actions.workload_identity_pool_id
-  workload_identity_pool_provider_id = "github-oidc"
-  display_name                       = "GitHub OIDC Provider"
-  description                        = "OIDC provider for GitHub Actions"
+  workload_identity_pool_provider_id = "users-github-oidc"
+  display_name                       = "Users - GitHub OIDC Provider"
+  description                        = "OIDC provider for GitHub Actions (service users)"
 
   attribute_mapping = {
     "google.subject"       = "assertion.sub"

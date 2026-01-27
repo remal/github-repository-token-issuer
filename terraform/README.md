@@ -97,8 +97,8 @@ This configuration creates the following GCP resources:
 - **Cloud Run Service** (`gh-repo-token-issuer`) - The serverless function
 - **Service Account** (`gh-repo-token-issuer-sa`) - Identity for Cloud Run
 - **Artifact Registry Repository** - Docker container registry
-- **Workload Identity Pool** (`github-actions`) - For GitHub OIDC authentication
-- **Workload Identity Pool Provider** (`github-oidc`) - GitHub OIDC configuration
+- **Workload Identity Pool** (`users-github-actions`) - For GitHub OIDC authentication
+- **Workload Identity Pool Provider** (`users-github-oidc`) - GitHub OIDC configuration
 - **IAM Bindings** - Permissions for Cloud Run invocation and Secret Manager access
 
 ### Resource Dependency Diagram
@@ -111,16 +111,16 @@ This configuration creates the following GCP resources:
    run.googleapis.com    secretmanager.googleapis.com   iamcredentials.googleapis.com
         │                       │                       │
         │                       │                       v
-        │                       │            ┌──────────────────────┐
-        │                       │            │ Workload Identity    │
-        │                       │            │ Pool (github-actions)│
-        │                       │            └──────────┬───────────┘
+        │                       │            ┌────────────────────────────┐
+        │                       │            │ Workload Identity          │
+        │                       │            │ Pool (users-github-actions)│
+        │                       │            └──────────┬─────────────────┘
         │                       │                       │
         │                       │                       v
-        │                       │            ┌─────────────────────┐
-        │                       │            │ WIF Provider        │
-        │                       │            │ (github-oidc)       │
-        │                       │            └──────────┬──────────┘
+        │                       │            ┌───────────────────────┐
+        │                       │            │ Workload Identity     │
+        │                       │            │ (users-github-oidc)   │
+        │                       │            └──────────┬────────────┘
         │                       │                       │
         v                       v                       │
    ┌─────────┐          ┌─────────────┐                 │
@@ -145,7 +145,7 @@ This configuration creates the following GCP resources:
               │
               v
    ┌───────────────────────┐
-   │ Cloud Run IAM         │<─── WIF Pool (invoker permission)
+   │ Cloud Run IAM         │<─── Workload Identity Pool (invoker permission)
    │ (github_oidc_invoker) │
    └───────────────────────┘
 
@@ -190,7 +190,7 @@ After deployment, Terraform provides:
 - `cloud_run_url` - The HTTPS endpoint for your service
 - `service_account_email` - The service account email
 - `artifact_registry_repository` - The container registry URL
-- `workload_identity_pool_provider` - The WIF provider name
+- `workload_identity_pool_provider` - The Workload Identity Federation provider name
 
 ## Updating Configuration
 
@@ -232,10 +232,10 @@ gcloud auth configure-docker us-east4-docker.pkg.dev
 
 ### Workload Identity Federation Issues
 
-Verify the WIF configuration:
+Verify the Workload Identity Federation configuration:
 
 ```bash
-gcloud iam workload-identity-pools describe github-actions \
+gcloud iam workload-identity-pools describe users-github-actions \
   --location=global \
   --format=json
 ```
