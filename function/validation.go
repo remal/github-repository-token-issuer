@@ -1,31 +1,163 @@
 package main
 
 import (
-	"encoding/base64"
+	"context"
+	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"net/http"
 	"strings"
+	"sync"
+	"time"
+
+	"encoding/base64"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-// ExtractRepositoryFromOIDC extracts the repository claim from a GitHub OIDC token.
-// Returns the repository in "owner/repo" format.
-// Note: GCP IAM has already validated the token signature, issuer, audience, and expiration.
-func ExtractRepositoryFromOIDC(token string) (string, error) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return "", fmt.Errorf("invalid JWT format")
+const (
+	githubOIDCIssuer  = "https://token.actions.githubusercontent.com"
+	githubJWKSURL     = "https://token.actions.githubusercontent.com/.well-known/jwks"
+	expectedAudience  = "gh-repo-token-issuer"
+	jwksCacheDuration = 1 * time.Hour
+)
+
+// JWKS represents a JSON Web Key Set.
+type JWKS struct {
+	Keys []JWK `json:"keys"`
+}
+
+// JWK represents a JSON Web Key.
+type JWK struct {
+	Kid string `json:"kid"`
+	Kty string `json:"kty"`
+	Alg string `json:"alg"`
+	Use string `json:"use"`
+	N   string `json:"n"`
+	E   string `json:"e"`
+}
+
+var (
+	jwksCache     *JWKS
+	jwksCacheTime time.Time
+	jwksMutex     sync.RWMutex
+)
+
+// fetchJWKS fetches GitHub's JWKS with caching.
+func fetchJWKS(ctx context.Context) (*JWKS, error) {
+	jwksMutex.RLock()
+	if jwksCache != nil && time.Since(jwksCacheTime) < jwksCacheDuration {
+		defer jwksMutex.RUnlock()
+		return jwksCache, nil
+	}
+	jwksMutex.RUnlock()
+
+	jwksMutex.Lock()
+	defer jwksMutex.Unlock()
+
+	// Double-check after acquiring write lock
+	if jwksCache != nil && time.Since(jwksCacheTime) < jwksCacheDuration {
+		return jwksCache, nil
 	}
 
-	// Decode the payload (middle part)
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, githubJWKSURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to decode JWT payload: %w", err)
+		return nil, fmt.Errorf("failed to create JWKS request: %w", err)
 	}
 
-	// Parse JSON claims
-	var claims map[string]interface{}
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return "", fmt.Errorf("failed to parse JWT claims: %w", err)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch JWKS: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("JWKS request failed with status %d", resp.StatusCode)
+	}
+
+	var jwks JWKS
+	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
+		return nil, fmt.Errorf("failed to decode JWKS: %w", err)
+	}
+
+	jwksCache = &jwks
+	jwksCacheTime = time.Now()
+	return &jwks, nil
+}
+
+// getPublicKey extracts the RSA public key for the given key ID from JWKS.
+func getPublicKey(jwks *JWKS, kid string) (*rsa.PublicKey, error) {
+	for _, key := range jwks.Keys {
+		if key.Kid == kid && key.Kty == "RSA" {
+			// Decode modulus
+			nBytes, err := base64.RawURLEncoding.DecodeString(key.N)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode modulus: %w", err)
+			}
+
+			// Decode exponent
+			eBytes, err := base64.RawURLEncoding.DecodeString(key.E)
+			if err != nil {
+				return nil, fmt.Errorf("failed to decode exponent: %w", err)
+			}
+
+			// Convert exponent bytes to int
+			var e int
+			for _, b := range eBytes {
+				e = e<<8 + int(b)
+			}
+
+			return &rsa.PublicKey{
+				N: new(big.Int).SetBytes(nBytes),
+				E: e,
+			}, nil
+		}
+	}
+	return nil, fmt.Errorf("key %s not found in JWKS", kid)
+}
+
+// ValidateAndExtractRepository validates the GitHub OIDC token and extracts the repository claim.
+// Validates: signature (against GitHub's JWKS), issuer, audience, and expiration.
+func ValidateAndExtractRepository(ctx context.Context, tokenString string) (string, error) {
+	// Fetch JWKS
+	jwks, err := fetchJWKS(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch JWKS: %w", err)
+	}
+
+	// Parse and validate token
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		// Verify signing method
+		if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+
+		// Get key ID
+		kid, ok := token.Header["kid"].(string)
+		if !ok {
+			return nil, fmt.Errorf("missing kid in token header")
+		}
+
+		// Get public key from JWKS
+		return getPublicKey(jwks, kid)
+	}, jwt.WithIssuer(githubOIDCIssuer),
+		jwt.WithAudience(expectedAudience),
+		jwt.WithExpirationRequired(),
+		jwt.WithValidMethods([]string{"RS256"}))
+
+	if err != nil {
+		return "", fmt.Errorf("token validation failed: %w", err)
+	}
+
+	if !token.Valid {
+		return "", fmt.Errorf("invalid token")
+	}
+
+	// Extract claims
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", fmt.Errorf("failed to extract claims")
 	}
 
 	// Extract repository claim

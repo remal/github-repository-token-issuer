@@ -110,18 +110,29 @@ jobs:
 
 ### Manual API Call (for testing)
 
+The service requires two forms of authentication:
+1. **GCP authentication** via Workload Identity Federation (for Cloud Run invocation)
+2. **GitHub OIDC token** in `X-GitHub-Token` header (for repository identification)
+
 ```bash
-# Obtain OIDC token from GitHub Actions
-OIDC_TOKEN=$(curl -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+# 1. Authenticate to GCP via Workload Identity Federation
+# This is typically done via google-github-actions/auth in workflows
+
+# 2. Get GCP identity token for Cloud Run
+GCP_ID_TOKEN=$(gcloud auth print-identity-token --audiences="https://gh-repo-token-issuer-xyz.run.app/token")
+
+# 3. Obtain GitHub OIDC token
+GITHUB_OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
   "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r .value)
 
-# Call the function with repository permission scopes
+# 4. Call the function with both tokens
 curl -X POST \
-  -H "Authorization: Bearer ${OIDC_TOKEN}" \
+  -H "Authorization: Bearer ${GCP_ID_TOKEN}" \
+  -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
   "https://gh-repo-token-issuer-xyz.run.app/token?contents=write&deployments=write&statuses=write"
 ```
 
-**Note**: The `audience` value must match the `oidc_audience` Terraform variable configured for the Workload Identity Pool Provider.
+**Note**: The `audience` value for the GitHub OIDC token must match the `oidc_audience` Terraform variable configured for the Workload Identity Pool Provider.
 
 ### Allowed Repository Permission Scopes
 

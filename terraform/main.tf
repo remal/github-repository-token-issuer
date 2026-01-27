@@ -161,7 +161,7 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
 }
 
 # IAM binding to allow GitHub OIDC tokens to invoke Cloud Run
-# This allows any repository to invoke the service
+# Callers must exchange GitHub OIDC for GCP token via Workload Identity Federation
 # Authorization is handled by the service itself (checks if GitHub App is installed)
 resource "google_cloud_run_v2_service_iam_member" "github_oidc_invoker" {
   project  = var.project_id
@@ -169,6 +169,15 @@ resource "google_cloud_run_v2_service_iam_member" "github_oidc_invoker" {
   name     = google_cloud_run_v2_service.github_token_issuer.name
   role     = "roles/run.invoker"
   member   = "principalSet://iam.googleapis.com/projects/${data.google_project.project.number}/locations/global/workloadIdentityPools/${google_iam_workload_identity_pool.github_actions.workload_identity_pool_id}/*"
+}
+
+# IAM binding to allow CI/CD service account to invoke Cloud Run for validation
+resource "google_cloud_run_v2_service_iam_member" "cicd_invoker" {
+  project  = var.project_id
+  location = google_cloud_run_v2_service.github_token_issuer.location
+  name     = google_cloud_run_v2_service.github_token_issuer.name
+  role     = "roles/run.invoker"
+  member   = "serviceAccount:gh-remal-gh-repo-token-issuer@gh-repo-token-issuer.iam.gserviceaccount.com"
 }
 
 # Workload Identity Pool for GitHub Actions (users of this service)

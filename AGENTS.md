@@ -50,7 +50,7 @@ action.yml    # Composite action in root
 **Never** create files in repository root except:
 
 - `action.yml` (already exists)
-- Documentation (README.md, DEVELOPMENT.md, AGENTS.md, CLAUDE.md)
+- Documentation (README.md, DEVELOPMENT.md, AGENTS.md)
 - Standard files (.gitignore, LICENSE, etc.)
 
 ## Documentation Standards
@@ -104,7 +104,7 @@ Check for these files both at the repository root and in affected subdirectories
 - ❌ Custom token expiration
 - ❌ Organization permissions
 - ❌ Testing infrastructure (mentioned as "will think about later")
-- ❌ Documentation beyond README.md, DEVELOPMENT.md, AGENTS.md, CLAUDE.md
+- ❌ Documentation beyond README.md, DEVELOPMENT.md, AGENTS.md
 
 ## Code Style
 
@@ -210,7 +210,7 @@ Standard status codes: 400, 401, 403, 500, 503 (see DEVELOPMENT.md for mappings)
 - **Query parameters for scopes**: `?scope_id=permission&scope_id=permission`
 - **No path parameters**: No `/repos/{owner}/{repo}` style paths
 - **No path validation**: Don't validate repository in URL against OIDC claims
-- **OIDC in header**: Authorization: Bearer <GITHUB_OIDC_TOKEN>
+- **Two-token authentication**: GCP identity token for Cloud Run, GitHub OIDC token for repository identification
 
 ### Request Format
 
@@ -223,7 +223,8 @@ Standard status codes: 400, 401, 403, 500, 503 (see DEVELOPMENT.md for mappings)
 **Headers**:
 
 ```
-Authorization: Bearer <GITHUB_OIDC_TOKEN>
+Authorization: Bearer <GCP_ID_TOKEN>
+X-GitHub-Token: <GITHUB_OIDC_TOKEN>
 ```
 
 **No request body** - all parameters in query string

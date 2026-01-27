@@ -34,23 +34,17 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
 
-	// Extract OIDC token from Authorization header
-	authHeader := r.Header.Get("Authorization")
-	if authHeader == "" {
-		writeError(w, http.StatusUnauthorized, "missing Authorization header", nil)
+	// Extract GitHub OIDC token from X-GitHub-Token header
+	// Note: Cloud Run authentication is handled by GCP IAM via Workload Identity Federation
+	// The X-GitHub-Token header contains the original GitHub OIDC token for repository extraction
+	oidcToken := r.Header.Get("X-GitHub-Token")
+	if oidcToken == "" {
+		writeError(w, http.StatusUnauthorized, "missing X-GitHub-Token header", nil)
 		return
 	}
 
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-		writeError(w, http.StatusUnauthorized, "invalid Authorization header format", nil)
-		return
-	}
-
-	oidcToken := parts[1]
-
-	// Extract repository from OIDC token
-	repository, err := ExtractRepositoryFromOIDC(oidcToken)
+	// Validate OIDC token and extract repository
+	repository, err := ValidateAndExtractRepository(ctx, oidcToken)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, fmt.Sprintf("invalid OIDC token: %v", err), nil)
 		return

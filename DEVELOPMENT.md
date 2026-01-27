@@ -40,27 +40,31 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 ┌──────────────────────────────────────────────────────────────┐
 │ GitHub Actions Workflow                                      │
 │                                                              │
-│  1. Obtain OIDC token from GitHub                            │
-│  2. Call Cloud Run with OIDC token as IAM bearer             │
+│  1. Authenticate to GCP via Workload Identity Federation     │
+│  2. Obtain GCP identity token for Cloud Run                  │
+│  3. Obtain GitHub OIDC token                                 │
+│  4. Call Cloud Run with both tokens:                         │
 │     POST /token?contents=write&deployments=write             │
-│     Authorization: Bearer <GITHUB_OIDC_TOKEN>                │
+│     Authorization: Bearer <GCP_ID_TOKEN>                     │
+│     X-GitHub-Token: <GITHUB_OIDC_TOKEN>                      │
 └─────────────────────┬────────────────────────────────────────┘
                       │
                       ▼
 ┌──────────────────────────────────────────────────────────────┐
 │ GCP Cloud Run (Go)                                           │
 │                                                              │
-│  1. GCP IAM validates GitHub OIDC token                      │
-│  2. Extract repository claim from OIDC token                 │
-│  3. Parse scope query parameters                             │
-│  4. Validate scopes against allowlist/blacklist              │
-│  5. Fetch GitHub App private key from Secret Manager         │
-│  6. Create JWT to authenticate as GitHub App                 │
-│  7. Fetch App permissions from GitHub API                    │
-│  8. Verify repo has App installed                            │
-│  9. Verify requested scopes don't exceed granted permissions │
-│ 10. Create installation token via GitHub API                 │
-│ 11. Return token with metadata                               │
+│  1. GCP IAM validates GCP identity token                     │
+│  2. Validate GitHub OIDC token (signature, issuer, audience) │
+│  3. Extract repository claim from OIDC token                 │
+│  4. Parse scope query parameters                             │
+│  5. Validate scopes against allowlist/blacklist              │
+│  6. Fetch GitHub App private key from Secret Manager         │
+│  7. Create JWT to authenticate as GitHub App                 │
+│  8. Fetch App permissions from GitHub API                    │
+│  9. Verify repo has App installed                            │
+│ 10. Verify requested scopes don't exceed granted permissions │
+│ 11. Create installation token via GitHub API                 │
+│ 12. Return token with metadata                               │
 └─────────────────────┬────────────────────────────────────────┘
                       │
                       ▼
@@ -74,17 +78,21 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 
 ```
 1. GitHub Actions Workflow
-   └─> Obtains OIDC token via ACTIONS_ID_TOKEN_REQUEST_URL
-   └─> Calls Cloud Run with OIDC token as Authorization header
+   └─> Authenticates to GCP via Workload Identity Federation
+   └─> Obtains GCP identity token for Cloud Run URL
+   └─> Obtains GitHub OIDC token via ACTIONS_ID_TOKEN_REQUEST_URL
+   └─> Calls Cloud Run with GCP token in Authorization header
+       and GitHub OIDC token in X-GitHub-Token header
 
 2. Cloud Run IAM Layer
-   └─> Validates OIDC token signature and issuer
-   └─> Checks token audience matches Cloud Run URL
-   └─> Verifies token hasn't expired
+   └─> Validates GCP identity token
+   └─> Checks caller has roles/run.invoker permission
    └─> Allows request through if valid
 
 3. Function Handler (handlers.go)
-   └─> Extracts repository claim from OIDC token
+   └─> Validates GitHub OIDC token from X-GitHub-Token header
+       (signature against GitHub JWKS, issuer, audience, expiration)
+   └─> Extracts repository claim from validated OIDC token
    └─> Parses query parameters for scopes
    └─> Calls validation logic
 
@@ -109,16 +117,19 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 
 **Request Flow Summary**:
 
-1. GitHub Actions Workflow generates OIDC token and calls Cloud Run
-2. GCP IAM validates GitHub OIDC token for Cloud Run invocation
-3. Service extracts repository from OIDC claims
-4. Service parses scope permissions from query parameters
-5. Service validates scopes against hardcoded allowlist/blacklist
-6. Service fetches GitHub App private key from Secret Manager
-7. Service creates JWT (10-minute expiry) to authenticate as GitHub App
-8. Service queries GitHub API for App installation and permissions
-9. Service creates installation token (1-hour expiry) with requested scopes
-10. Service returns token and metadata as JSON response
+1. GitHub Actions Workflow authenticates to GCP via Workload Identity Federation
+2. Workflow obtains GCP identity token and GitHub OIDC token
+3. Workflow calls Cloud Run with both tokens
+4. GCP IAM validates GCP identity token for Cloud Run invocation
+5. Service validates GitHub OIDC token (signature, issuer, audience, expiration)
+6. Service extracts repository from validated OIDC claims
+7. Service parses scope permissions from query parameters
+8. Service validates scopes against hardcoded allowlist/blacklist
+9. Service fetches GitHub App private key from Secret Manager
+10. Service creates JWT (10-minute expiry) to authenticate as GitHub App
+11. Service queries GitHub API for App installation and permissions
+12. Service creates installation token (1-hour expiry) with requested scopes
+13. Service returns token and metadata as JSON response
 
 ## Code Structure
 
@@ -152,16 +163,16 @@ terraform/             # Infrastructure as Code
 
 - `TokenHandler()`: Main request handler
 - Query parameter parsing (scope name → permission level)
-- OIDC token extraction from Authorization header
+- GitHub OIDC token extraction from X-GitHub-Token header
 - Response formatting (JSON with token + metadata)
 - Error response handling (400, 401, 403, 500, 503)
 
 #### `function/validation.go`
 
 - `ValidateScopes()`: Check for duplicates, allowlist/blacklist
-- `ExtractRepositoryFromOIDC()`: Parse repository claim
-- `ValidateScopePermissions()`: Verify read/write are valid
-- Duplicate detection logic
+- `ValidateAndExtractRepository()`: Validate OIDC token and extract repository claim
+- OIDC token signature validation against GitHub's JWKS
+- Issuer, audience, and expiration validation
 
 #### `function/scopes.go`
 
@@ -183,12 +194,17 @@ terraform/             # Infrastructure as Code
 
 ### OIDC Token Validation
 
-**GCP IAM handles validation**, so the function receives a pre-validated token. The function only extracts claims:
+The function validates the GitHub OIDC token from the `X-GitHub-Token` header:
+
+1. **Signature verification** against GitHub's JWKS (`https://token.actions.githubusercontent.com/.well-known/jwks`)
+2. **Issuer validation** (`https://token.actions.githubusercontent.com`)
+3. **Audience validation** (`gh-repo-token-issuer`)
+4. **Expiration check**
 
 ```go
-// Extract repository claim from OIDC token
+// Validate OIDC token and extract repository claim
 // Expected format: "owner/repo"
-repository := extractClaimFromJWT(token, "repository")
+repository, err := ValidateAndExtractRepository(ctx, oidcToken)
 ```
 
 **No additional signature verification needed** - GCP IAM already verified:
@@ -272,7 +288,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 | Duplicate scope          | 400    | Same scope appears multiple times | Reject request             |
 | Invalid scope            | 400    | Scope not in allowlist            | Reject request             |
 | Blacklisted scope        | 400    | Scope in blacklist                | Reject request             |
-| Invalid OIDC             | 401    | GCP IAM rejection                 | Should never reach service |
+| Invalid OIDC             | 401    | OIDC validation failed            | Reject request             |
 | App not installed        | 403    | GitHub App not on repo            | Reject request             |
 | Insufficient permissions | 403    | App lacks permission              | Reject request             |
 | Secret Manager error     | 500    | Can't fetch private key           | Reject request             |
@@ -327,18 +343,19 @@ AllowedScopes = map[string][]string{
 
 ### OIDC Token Validation
 
-**GCP IAM validates**:
+**Two-layer authentication**:
 
-- Signature validity (RS256)
-- Issuer is GitHub Actions
-- Audience matches Cloud Run URL
-- Token hasn't expired
-- Token wasn't revoked
+1. **GCP IAM Layer** (Cloud Run invocation):
+   - Validates GCP identity token
+   - Checks caller has `roles/run.invoker` via Workload Identity Federation
+   - Enforces attribute conditions (audience, repository prefix)
 
-**Function validates**:
-
-- Repository claim exists
-- Repository format is valid (owner/repo)
+2. **Function Layer** (GitHub OIDC in X-GitHub-Token header):
+   - Validates signature against GitHub's JWKS
+   - Verifies issuer is `https://token.actions.githubusercontent.com`
+   - Verifies audience is `gh-repo-token-issuer`
+   - Checks token hasn't expired
+   - Extracts repository claim for authorization
 
 ### Sensitive Data Protection
 
@@ -422,16 +439,22 @@ Scopes are specified as query parameters where the parameter name is the **repos
 ### Request Headers
 
 ```
-Authorization: Bearer <GITHUB_OIDC_TOKEN>
+Authorization: Bearer <GCP_ID_TOKEN>
+X-GitHub-Token: <GITHUB_OIDC_TOKEN>
 ```
 
-The GitHub OIDC token serves as both the GCP IAM authentication token and the source of caller identity (repository claim).
+- **Authorization**: GCP identity token for Cloud Run authentication (obtained via Workload Identity Federation)
+- **X-GitHub-Token**: GitHub OIDC token for repository identification and authorization
 
 ### Request Example
 
 ```bash
+# Requires prior authentication to GCP via Workload Identity Federation
+GCP_ID_TOKEN=$(gcloud auth print-identity-token --audiences="https://gh-repo-token-issuer-xyz.run.app/token")
+
 curl -X POST \
-  -H "Authorization: Bearer ${GITHUB_OIDC_TOKEN}" \
+  -H "Authorization: Bearer ${GCP_ID_TOKEN}" \
+  -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
   "https://gh-repo-token-issuer-xyz.run.app/token?issues=write&pull_requests=read"
 ```
 
@@ -494,11 +517,17 @@ curl -X POST \
 
 ### Authentication Flow
 
-**GitHub OIDC Token as IAM Bearer Token**:
+**Two-Token Authentication**:
 
-- The GitHub Actions OIDC token is used directly as the Cloud Run IAM bearer token
-- GCP IAM validates the token signature and claims
-- No additional authentication layer required
+1. **GCP Identity Token** (Authorization header):
+   - Obtained via Workload Identity Federation
+   - Authenticates the caller to Cloud Run
+   - GCP IAM validates this token
+
+2. **GitHub OIDC Token** (X-GitHub-Token header):
+   - Identifies the calling repository
+   - Function validates signature against GitHub's JWKS
+   - Function validates issuer, audience, and expiration
 
 ### Required OIDC Claims
 
@@ -694,13 +723,15 @@ go run .
 ### Testing with curl
 
 ```bash
-# You'll need a real GitHub OIDC token from a workflow
-# or mock the GCP IAM validation layer for local testing
+# Local testing requires a real GitHub OIDC token from a workflow.
+# The function validates the token signature against GitHub's JWKS.
 
 curl -X POST \
-  -H "Authorization: Bearer ${GITHUB_OIDC_TOKEN}" \
+  -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
   "http://localhost:8080/TokenHandler?contents=write&deployments=write"
 ```
+
+Note: When running locally, Cloud Run's GCP IAM layer is bypassed, so only the `X-GitHub-Token` header is needed.
 
 ### Linting
 
@@ -840,7 +871,7 @@ terraform apply
 1. Creating Cloud Run service with placeholder image
 2. Creating Artifact Registry repository
 3. Configuring environment variables
-4. Setting up IAM bindings for OIDC
+4. Setting up IAM bindings for Workload Identity Federation
 5. Managing service account permissions
 
 **CI/CD handles**:
