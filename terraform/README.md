@@ -101,6 +101,61 @@ This configuration creates the following GCP resources:
 - **Workload Identity Pool Provider** (`github-oidc`) - GitHub OIDC configuration
 - **IAM Bindings** - Permissions for Cloud Run invocation and Secret Manager access
 
+### Resource Dependency Diagram
+
+```
+                            GCP APIs (enabled first)
+        ┌───────────────────────┼───────────────────────┐
+        │                       │                       │
+        v                       v                       v
+   run.googleapis.com    secretmanager.googleapis.com   iamcredentials.googleapis.com
+        │                       │                       │
+        │                       │                       v
+        │                       │            ┌──────────────────────┐
+        │                       │            │ Workload Identity    │
+        │                       │            │ Pool (github-actions)│
+        │                       │            └──────────┬───────────┘
+        │                       │                       │
+        │                       │                       v
+        │                       │            ┌─────────────────────┐
+        │                       │            │ WIF Provider        │
+        │                       │            │ (github-oidc)       │
+        │                       │            └──────────┬──────────┘
+        │                       │                       │
+        v                       v                       │
+   ┌─────────┐          ┌─────────────┐                 │
+   │Artifact │          │ Service     │                 │
+   │Registry │          │ Account     │                 │
+   └────┬────┘          │ (cloud_run_sa)                │
+        │               └──────┬──────┘                 │
+        │                      │                        │
+        │    ┌─────────────────┼────────────────────────┘
+        │    │                 │
+        │    │                 v
+        │    │    ┌────────────────────────┐
+        │    │    │ Secret Manager IAM     │
+        │    │    │ (secretAccessor role)  │
+        │    │    └────────────────────────┘
+        │    │                 │
+        v    v                 │
+   ┌───────────────────────┐   │
+   │ Cloud Run Service     │<──┘
+   │ (gh-repo-token-issuer)│
+   └──────────┬────────────┘
+              │
+              v
+   ┌───────────────────────┐
+   │ Cloud Run IAM         │<─── WIF Pool (invoker permission)
+   │ (github_oidc_invoker) │
+   └───────────────────────┘
+
+External (not managed by Terraform):
+   ┌───────────────────────┐
+   │ Secret Manager Secret │ (github-app-private-key)
+   │ (created manually)    │
+   └───────────────────────┘
+```
+
 ## Deploying Code Changes
 
 When you make changes to the Go code in `function/`, deploy using source-based deployment:
