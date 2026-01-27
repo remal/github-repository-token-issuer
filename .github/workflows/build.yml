@@ -145,64 +145,24 @@ jobs:
           --no-traffic \
           --tag=commit-${SHORT_SHA}
 
+    - name: Get short SHA
+      id: short-sha
+      run: echo "value=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
     - name: Validate deployed revision
+      id: validate
+      uses: ./
+      with:
+        scopes: |
+          contents:write
+        service_tag: commit-${{steps.short-sha.outputs.value}}
+
+    - name: Verify token scopes
       run: |
-        SHORT_SHA=$(git rev-parse --short HEAD)
-        CANARY_URL="https://commit-${SHORT_SHA}---gh-repo-token-issuer-db7udto7gq-uk.a.run.app/token?contents=write"
-
-        # Step 1: Get GitHub OIDC token (emulates user flow)
-        # Audience must match the oidc_audience configured in Workload Identity Pool Provider
-        GITHUB_OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r '.value')
-        echo "::add-mask::$GITHUB_OIDC_TOKEN"
-
-        # Step 2: Exchange GitHub OIDC token for GCP access token via STS API
-        # This uses the users-github-actions pool (same as real users would)
-        STS_RESPONSE=$(curl -sS -X POST \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-          --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
-          --data-urlencode "subject_token=${GITHUB_OIDC_TOKEN}" \
-          --data-urlencode "audience=//iam.googleapis.com/projects/74155037973/locations/global/workloadIdentityPools/users-github-actions/providers/users-github-oidc" \
-          "https://sts.googleapis.com/v1/token")
-
-        GCP_ACCESS_TOKEN=$(echo "$STS_RESPONSE" | jq -r '.access_token')
-        if [ -z "$GCP_ACCESS_TOKEN" ] || [ "$GCP_ACCESS_TOKEN" = "null" ]; then
-          echo "Failed to exchange GitHub OIDC token for GCP access token"
-          echo "$STS_RESPONSE"
-          exit 1
-        fi
-        echo "::add-mask::$GCP_ACCESS_TOKEN"
-
-        # Step 3: Call Cloud Run with both tokens
-        RESPONSE=$(curl -sS -w "\n%{http_code}" \
-          -H "Authorization: Bearer $GCP_ACCESS_TOKEN" \
-          -H "X-GitHub-Token: $GITHUB_OIDC_TOKEN" \
-          "$CANARY_URL")
-        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-        BODY=$(echo "$RESPONSE" | sed '$d')
-
-        if [ "$HTTP_CODE" != "200" ]; then
-          echo "Token request failed with status $HTTP_CODE"
-          echo "$BODY"
-          exit 1
-        fi
-
-        TOKEN=$(echo "$BODY" | jq -r '.token')
-        if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
-          echo "Failed to extract token from response"
-          echo "$BODY"
-          exit 1
-        fi
-        echo "::add-mask::$TOKEN"
-
-        # Validate token scopes via GitHub API
-        SCOPES=$(curl -sI -H "Authorization: Bearer $TOKEN" \
+        echo "::add-mask::${{steps.validate.outputs.token}}"
+        SCOPES=$(curl -sI -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
           https://api.github.com/user | grep -i "x-oauth-scopes:" | cut -d' ' -f2- | tr -d '\r')
-
         echo "Returned scopes: $SCOPES"
-
-        # Check if contents scope is present
         if echo "$SCOPES" | grep -q "contents"; then
           echo "Scope validation passed"
         else
