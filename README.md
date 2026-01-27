@@ -64,6 +64,9 @@ The repository includes a composite action (`action.yml`) that simplifies callin
       pull_requests:read
       deployments:write
     ```
+- `service_tag`: (optional) Cloud Run service tag for canary deployments
+  - When set, uses the tag-specific URL (e.g., `https://<tag>---gh-repo-token-issuer-...`)
+  - Used for testing new deployments before migrating traffic
 
 **Outputs**:
 

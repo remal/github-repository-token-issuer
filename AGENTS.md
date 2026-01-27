@@ -173,7 +173,9 @@ Check for these files both at the repository root and in affected subdirectories
 ## GitHub Actions Integration
 
 - Composite action at `./action.yml`
-- Input: `scopes` (multiline format, one scope:permission per line)
+- Inputs:
+  - `scopes` (required): multiline format, one scope:permission per line
+  - `service_tag` (optional): Cloud Run service tag for canary deployments
 - Output: `token`
 - Requires `permissions: id-token: write` in workflow
 
