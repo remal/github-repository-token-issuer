@@ -21,3 +21,9 @@ variable "workload_identity_additional_condition" {
   type        = string
   default     = "attribute.repository.startsWith('remal/')"
 }
+
+variable "oidc_audience" {
+  description = "Required OIDC audience value that must match in token claims"
+  type        = string
+  default     = "gh-repo-token-issuer"
+}

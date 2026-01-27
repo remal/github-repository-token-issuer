@@ -140,11 +140,66 @@ jobs:
         docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} .
         docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
 
-    - name: Deploy to Cloud Run
+    - name: Deploy to Cloud Run (no traffic)
       if: ${{github.ref == 'refs/heads/main'}}
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
         gcloud run deploy gh-repo-token-issuer \
           --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
-          --region=us-east4
+          --region=us-east4 \
+          --no-traffic \
+          --tag=commit-${SHORT_SHA}
+        exit 1
+
+    - name: Validate deployed revision
+      if: ${{github.ref == 'refs/heads/main'}}
+      run: |
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        CANARY_URL="https://commit-${SHORT_SHA}---gh-repo-token-issuer-lm73hu4n5a-uk.a.run.app/token?contents=write"
+
+        # Get GitHub OIDC token
+        OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r '.value')
+
+        # Get token from deployed service
+        RESPONSE=$(curl -sS -w "\n%{http_code}" \
+          -H "Authorization: Bearer $OIDC_TOKEN" \
+          "$CANARY_URL")
+        HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
+
+        if [ "$HTTP_CODE" != "200" ]; then
+          echo "Token request failed with status $HTTP_CODE"
+          echo "$BODY"
+          exit 1
+        fi
+
+        TOKEN=$(echo "$BODY" | jq -r '.token')
+        if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+          echo "Failed to extract token from response"
+          echo "$BODY"
+          exit 1
+        fi
+
+        # Validate token scopes via GitHub API
+        SCOPES=$(curl -sI -H "Authorization: Bearer $TOKEN" \
+          https://api.github.com/user | grep -i "x-oauth-scopes:" | cut -d' ' -f2- | tr -d '\r')
+
+        echo "Returned scopes: $SCOPES"
+
+        # Check if contents scope is present
+        if echo "$SCOPES" | grep -q "contents"; then
+          echo "Scope validation passed"
+        else
+          echo "Scope validation failed: expected 'contents' in scopes"
+          exit 1
+        fi
+
+    - name: Migrate traffic to new revision
+      if: ${{github.ref == 'refs/heads/main'}}
+      run: |
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        gcloud run services update-traffic gh-repo-token-issuer \
+          --region=us-east4 \
+          --to-tags=commit-${SHORT_SHA}=100
 

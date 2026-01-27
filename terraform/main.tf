@@ -184,6 +184,6 @@ resource "google_iam_workload_identity_pool_provider" "github" {
     issuer_uri = "https://token.actions.githubusercontent.com"
   }
 
-  # Require valid repository claim - authorization handled by the service
-  attribute_condition = var.workload_identity_additional_condition != "" ? "attribute.repository != '' && (${var.workload_identity_additional_condition})" : "attribute.repository != ''"
+  # Require matching audience - authorization handled by the service
+  attribute_condition = var.workload_identity_additional_condition != "" ? "attribute.aud == '${var.oidc_audience}' && (${var.workload_identity_additional_condition})" : "attribute.aud == '${var.oidc_audience}'"
 }

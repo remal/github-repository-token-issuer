@@ -9,7 +9,10 @@ region = "us-central1"
 # Your GitHub App ID (found in GitHub App settings)
 github_app_id = "123456"
 
+# Required OIDC audience value that must match in token claims
+oidc_audience = "gh-repo-token-issuer"
+
 # Optional: Additional CEL condition for Workload Identity Pool Provider
-# This is appended to the base condition: attribute.repository != ''
+# This is appended to the base condition: attribute.aud == '<oidc_audience>'
 # Example: Restrict to repositories in a specific organization
 # workload_identity_additional_condition = "attribute.repository.startsWith('myorg/')"
