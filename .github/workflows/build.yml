@@ -111,13 +111,11 @@ jobs:
       run: terraform apply -auto-approve
 
     - name: Go - Setup
-      if: ${{github.ref == 'refs/heads/main'}}
       uses: actions/setup-go@v6
       with:
         go-version: '1.25'
         cache-dependency-path: function/go.sum
     - name: Go - Build
-      if: ${{github.ref == 'refs/heads/main'}}
       working-directory: ./function
       env:
         CGO_ENABLED: '0'
@@ -129,11 +127,9 @@ jobs:
       uses: google-github-actions/setup-gcloud@v3
 
     - name: Configure Docker for Artifact Registry
-      if: ${{github.ref == 'refs/heads/main'}}
       run: gcloud auth configure-docker us-east4-docker.pkg.dev --quiet
 
     - name: Build and push Docker image
-      if: ${{github.ref == 'refs/heads/main'}}
       working-directory: ./function
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
@@ -141,7 +137,6 @@ jobs:
         docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
 
     - name: Deploy to Cloud Run (no traffic)
-      if: ${{github.ref == 'refs/heads/main'}}
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
         gcloud run deploy gh-repo-token-issuer \
@@ -149,13 +144,11 @@ jobs:
           --region=us-east4 \
           --no-traffic \
           --tag=commit-${SHORT_SHA}
-        exit 1
 
     - name: Validate deployed revision
-      if: ${{github.ref == 'refs/heads/main'}}
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
-        CANARY_URL="https://commit-${SHORT_SHA}---gh-repo-token-issuer-lm73hu4n5a-uk.a.run.app/token?contents=write"
+        CANARY_URL="https://commit-${SHORT_SHA}---gh-repo-token-issuer-db7udto7gq-uk.a.run.app/token?contents=write"
 
         # Get GitHub OIDC token
         OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
@@ -196,7 +189,6 @@ jobs:
         fi
 
     - name: Migrate traffic to new revision
-      if: ${{github.ref == 'refs/heads/main'}}
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
         gcloud run services update-traffic gh-repo-token-issuer \
