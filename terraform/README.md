@@ -8,7 +8,7 @@ This directory contains the Terraform configuration for deploying the GitHub Rep
 2. **Terraform** installed (see `.terraform-version` or `terraform/main.tf` for constraints)
 3. **gcloud CLI** installed and authenticated
 4. **GitHub App** created with repository permissions
-5. **GitHub App private key** stored in GCP Secret Manager
+5. **GitHub App private key** downloaded (will be stored in Secret Manager by Terraform)
 
 ## Required GCP APIs
 
@@ -23,16 +23,7 @@ gcloud services enable artifactregistry.googleapis.com
 
 ## Setup Steps
 
-### 1. Store GitHub App Private Key
-
-Before running Terraform, create the Secret Manager secret with your GitHub App private key:
-
-```bash
-gcloud secrets create github-app-private-key \
-  --data-file=path/to/your-private-key.pem
-```
-
-### 2. Configure Terraform Backend
+### 1. Configure Terraform Backend
 
 Update the GCS bucket name in `main.tf`:
 
@@ -51,7 +42,7 @@ gcloud storage buckets create gs://your-terraform-state-bucket \
   --uniform-bucket-level-access
 ```
 
-### 3. Configure Variables
+### 2. Configure Variables
 
 Copy the example variables file and fill in your values:
 
@@ -73,22 +64,33 @@ oidc_audience = "gh-repo-token-issuer"  # Required: OIDC audience for Workload I
 
 **Note**: The `oidc_audience` value must match the `audience` parameter used when requesting OIDC tokens in GitHub Actions workflows.
 
-### 4. Initialize Terraform
+### 3. Initialize Terraform
 
 ```bash
 terraform init
 ```
 
-### 5. Review the Plan
+### 4. Review the Plan
 
 ```bash
 terraform plan
 ```
 
-### 6. Apply Configuration
+### 5. Apply Configuration
 
 ```bash
 terraform apply
+```
+
+This creates all resources including an empty Secret Manager secret.
+
+### 6. Add GitHub App Private Key
+
+After Terraform creates the secret, add your private key:
+
+```bash
+gcloud secrets versions add github-app-private-key \
+  --data-file=path/to/your-private-key.pem
 ```
 
 After successful deployment, Terraform will output the Cloud Run service URL.
@@ -100,6 +102,7 @@ This configuration creates the following GCP resources:
 - **Cloud Run Service** (`gh-repo-token-issuer`) - The serverless function
 - **Service Account** (`gh-repo-token-issuer-sa`) - Identity for Cloud Run
 - **Artifact Registry Repository** - Docker container registry
+- **Secret Manager Secret** (`github-app-private-key`) - Stores GitHub App private key
 - **Workload Identity Pool** (`users-github-actions`) - For GitHub OIDC authentication
 - **Workload Identity Pool Provider** (`users-github-oidc`) - GitHub OIDC configuration
 - **IAM Bindings** - Permissions for Cloud Run invocation and Secret Manager access
@@ -136,13 +139,19 @@ This configuration creates the following GCP resources:
         │    │                 │
         │    │                 v
         │    │    ┌────────────────────────┐
+        │    │    │ Secret Manager Secret  │
+        │    │    │ (github-app-private-key)│
+        │    │    └───────────┬────────────┘
+        │    │                │
+        │    │                v
+        │    │    ┌────────────────────────┐
         │    │    │ Secret Manager IAM     │
         │    │    │ (secretAccessor role)  │
         │    │    └────────────────────────┘
-        │    │                 │
-        v    v                 │
-   ┌───────────────────────┐   │
-   │ Cloud Run Service     │<──┘
+        │    │                │
+        v    v                │
+   ┌───────────────────────┐  │
+   │ Cloud Run Service     │<─┘
    │ (gh-repo-token-issuer)│
    └──────────┬────────────┘
               │
@@ -152,11 +161,9 @@ This configuration creates the following GCP resources:
    │ (github_oidc_invoker) │
    └───────────────────────┘
 
-External (not managed by Terraform):
-   ┌───────────────────────┐
-   │ Secret Manager Secret │ (github-app-private-key)
-   │ (created manually)    │
-   └───────────────────────┘
+Notes:
+   - Secret has prevent_destroy lifecycle (won't be deleted on terraform destroy)
+   - Secret version (private key value) is added manually via gcloud
 ```
 
 ## Deploying Code Changes
@@ -211,7 +218,13 @@ To remove all created resources:
 terraform destroy
 ```
 
-**Warning**: This will delete the Cloud Run service and all associated resources. The Secret Manager secret and GCS state bucket are not deleted automatically.
+**Warning**: This will delete the Cloud Run service and all associated resources. The Secret Manager secret is protected with `prevent_destroy` and will not be deleted. The GCS state bucket is also not deleted automatically.
+
+To force-delete the secret, first remove it from state:
+
+```bash
+terraform state rm google_secret_manager_secret.github_app_private_key
+```
 
 ## Troubleshooting
 

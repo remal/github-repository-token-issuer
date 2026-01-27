@@ -608,6 +608,7 @@ All infrastructure defined in `terraform/main.tf`:
 - Name: `github-app-private-key`
 - Contains: GitHub App private key in PEM format
 - Access: Cloud Run service account has `secretmanager.secretAccessor` role
+- Lifecycle: Protected with `prevent_destroy` (secret version added manually after creation)
 
 3. **Service Account**
 
@@ -766,13 +767,7 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
 
    Required APIs (`run.googleapis.com`, `secretmanager.googleapis.com`, `iamcredentials.googleapis.com`) are enabled automatically by Terraform.
 
-3. **Store GitHub App Private Key**:
-   ```bash
-   gcloud secrets create github-app-private-key \
-     --data-file=path/to/private-key.pem
-   ```
-
-4. **Configure Terraform**:
+3. **Configure Terraform**:
    ```bash
    # Navigate to terraform directory
    cd terraform
@@ -788,10 +783,18 @@ Note: `GITHUB_APP_ID` env var is required because `init()` validates it at start
    EOF
    ```
 
-5. **Deploy Infrastructure**:
+4. **Deploy Infrastructure**:
    ```bash
    terraform plan
    terraform apply
+   ```
+
+   Terraform creates the Secret Manager secret (empty). The secret is protected from accidental deletion with `prevent_destroy`.
+
+5. **Add GitHub App Private Key** (after Terraform creates the secret):
+   ```bash
+   gcloud secrets versions add github-app-private-key \
+     --data-file=path/to/private-key.pem
    ```
 
 6. **Build and Deploy Service Code**:

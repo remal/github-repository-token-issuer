@@ -83,13 +83,27 @@ resource "google_service_account" "cloud_run_sa" {
   description  = "Service account for gh-repo-token-issuer Cloud Run service"
 }
 
-# Grant Secret Manager access to service account
-resource "google_secret_manager_secret_iam_member" "secret_accessor" {
+# Secret for GitHub App private key (value must be added manually after creation)
+resource "google_secret_manager_secret" "github_app_private_key" {
   secret_id = "github-app-private-key"
-  role      = "roles/secretmanager.secretAccessor"
-  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
+
+  replication {
+    auto {}
+  }
+
+  # Prevent accidental deletion - secret contains sensitive data added manually
+  lifecycle {
+    prevent_destroy = true
+  }
 
   depends_on = [google_project_service.secretmanager]
+}
+
+# Grant Secret Manager access to service account
+resource "google_secret_manager_secret_iam_member" "secret_accessor" {
+  secret_id = google_secret_manager_secret.github_app_private_key.secret_id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = "serviceAccount:${google_service_account.cloud_run_sa.email}"
 }
 
 # Cloud Run service
