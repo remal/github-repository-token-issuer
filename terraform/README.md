@@ -65,10 +65,13 @@ Edit `terraform.tfvars`:
 project_id    = "your-gcp-project-id"
 region        = "us-east4"
 github_app_id = "123456"  # Your GitHub App ID
+oidc_audience = "gh-repo-token-issuer"  # Required: OIDC audience for Workload Identity
 
 # Optional: Restrict which repositories can authenticate
 # workload_identity_additional_condition = "attribute.repository.startsWith('myorg/')"
 ```
+
+**Note**: The `oidc_audience` value must match the `audience` parameter used when requesting OIDC tokens in GitHub Actions workflows.
 
 ### 4. Initialize Terraform
 
