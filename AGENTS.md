@@ -7,6 +7,7 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 - **Budget Watchdog:** You are running on a restricted token budget.
 - **Trigger:** If our conversation history exceeds 20 messages or the context feels bloated, you MUST end your response with: "⚠️ [Budget Alert] Context is heavy. Run /compact."
 - **Files:** Do not read lockfiles (package-lock.json, etc) or huge logs unless explicitly told.
+- **Documentation:** NEVER mark a task complete without updating documentation. See "Documentation Maintenance" checklist below.
 
 ## Project Philosophy
 
@@ -63,7 +64,7 @@ action.yml    # Composite action in root
 
 ### Documentation Maintenance
 
-You MUST update documentation when code changes affect documented behavior. Before completing any code change, verify:
+**MANDATORY**: You MUST update documentation when code changes affect documented behavior. Add documentation updates to your todo list BEFORE starting implementation. Before completing any code change, verify:
 
 - [ ] **README.md** updated (if usage, examples, variable defaults, or feature descriptions changed)
 - [ ] **DEVELOPMENT.md** updated (if architecture, implementation, local dev, deployment changed)

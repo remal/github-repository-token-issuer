@@ -65,6 +65,9 @@ Edit `terraform.tfvars`:
 project_id    = "your-gcp-project-id"
 region        = "us-east4"
 github_app_id = "123456"  # Your GitHub App ID
+
+# Optional: Restrict which repositories can authenticate
+# workload_identity_additional_condition = "attribute.repository.startsWith('myorg/')"
 ```
 
 ### 4. Initialize Terraform
