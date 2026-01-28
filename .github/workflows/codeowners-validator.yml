@@ -51,3 +51,4 @@ jobs:
       uses: mszostok/codeowners-validator@v0.7.4
       with:
         github_access_token: '${{steps.get-token.outputs.token}}'
+        checks: ${{steps.owner-type.outputs.owner-type == 'organization' && '' || 'duppatterns,files,syntax'}}
