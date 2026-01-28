@@ -159,7 +159,6 @@ jobs:
 
     - name: Verify token scopes
       run: |
-        echo "::add-mask::${{steps.validate.outputs.token}}"
         SCOPES=$(curl -sI -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
           https://api.github.com/user | grep -i "x-oauth-scopes:" | cut -d' ' -f2- | tr -d '\r')
         echo "Returned scopes: $SCOPES"
