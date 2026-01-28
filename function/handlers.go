@@ -65,6 +65,13 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate repository owner is allowed (if GITHUB_ALLOWED_OWNERS is configured)
+	allowedOwners := ParseAllowedOwners()
+	if err := ValidateOwnerAllowed(repository, allowedOwners); err != nil {
+		writeError(w, http.StatusForbidden, err.Error(), nil)
+		return
+	}
+
 	// Parse scopes from query parameters
 	scopes := make(map[string]string)
 	for param, values := range r.URL.Query() {

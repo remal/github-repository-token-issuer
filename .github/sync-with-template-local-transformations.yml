@@ -27,3 +27,10 @@ transformations:
       }
     })
     return content
+- name: .gitignore
+  format: text
+  includes:
+  - .gitignore
+  script: |
+    return content
+      .replace(/(^|\n)(\*\.tfvars)(\n|$)/, '$1#$2$3')

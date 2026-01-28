@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -200,4 +201,42 @@ func ValidateScopes(scopes map[string]string) error {
 	}
 
 	return nil
+}
+
+// ParseAllowedOwners parses the GITHUB_ALLOWED_OWNERS environment variable.
+// Returns a slice of allowed owners (empty slice means all owners are allowed).
+// Format: comma-separated list of owner names, whitespace is trimmed.
+func ParseAllowedOwners() []string {
+	owners := []string{}
+	envValue := os.Getenv("GITHUB_ALLOWED_OWNERS")
+	for _, part := range strings.Split(envValue, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			owners = append(owners, trimmed)
+		}
+	}
+	return owners
+}
+
+// ValidateOwnerAllowed validates that the repository owner is in the allowed list.
+// If allowedOwners is empty, all owners are allowed.
+// Repository format is expected to be "owner/repo".
+func ValidateOwnerAllowed(repository string, allowedOwners []string) error {
+	if len(allowedOwners) == 0 {
+		return nil
+	}
+
+	parts := strings.Split(repository, "/")
+	if len(parts) < 2 {
+		return fmt.Errorf("invalid repository format: %s", repository)
+	}
+	owner := parts[0]
+
+	for _, allowed := range allowedOwners {
+		if allowed == owner {
+			return nil
+		}
+	}
+
+	return fmt.Errorf("repository owner '%s' is not allowed", owner)
 }

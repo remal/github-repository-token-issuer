@@ -1,13 +1,13 @@
-# Example Terraform variables file
-# Copy this to terraform.tfvars and fill in your values
-
-project_id = "your-gcp-project-id"
-
-# GCP region for Cloud Run and other resources
-region = "us-central1"
+project_id = "gh-repo-token-issuer"
 
 # Your GitHub App ID (found in GitHub App settings)
-github_app_id = "123456"
+github_app_id = "2637135"
+
+github_allowed_owners = [
+  "remal",
+  "remal-gradle-plugins",
+  "remal-github-actions",
+]
 
 # Optional: List of GitHub repository owners allowed to request tokens
 # If empty or not set, all owners are allowed

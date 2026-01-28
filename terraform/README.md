@@ -30,7 +30,7 @@ Update the GCS bucket name in `main.tf`:
 ```hcl
 backend "gcs" {
   bucket = "your-terraform-state-bucket"  # Change this to your bucket
-  prefix = "gh-repo-token-issuer"
+  prefix = "default"
 }
 ```
 
@@ -54,8 +54,13 @@ Edit `terraform.tfvars`:
 
 ```hcl
 project_id    = "your-gcp-project-id"
-region        = "us-east4"
 github_app_id = "123456"  # Your GitHub App ID
+
+# Optional: Override default region (default: us-east4)
+# region = "us-central1"
+
+# Optional: Restrict which repository owners can request tokens
+# github_allowed_owners = ["my-org", "my-username"]
 ```
 
 ### 3. Initialize Terraform
@@ -95,7 +100,7 @@ This configuration creates the following GCP resources:
 
 - **Cloud Run Service** (`gh-repo-token-issuer`) - The serverless function
 - **Service Account** (`gh-repo-token-issuer-sa`) - Identity for Cloud Run
-- **Artifact Registry Repository** - Docker container registry
+- **Artifact Registry Repository** - Docker container registry (with cleanup policies: deletes untagged images and images older than 1 hour)
 - **Secret Manager Secret** (`github-app-private-key`) - Stores GitHub App private key
 - **IAM Bindings** - Public access for Cloud Run invocation and Secret Manager access for service account
 
@@ -141,27 +146,26 @@ Notes:
 
 ## Deploying Code Changes
 
-When you make changes to the Go code in `function/`, deploy using source-based deployment:
+When you make changes to the Go code in `function/`, build and deploy via Artifact Registry:
 
 ```bash
 # From repository root
-gcloud beta run deploy gh-repo-token-issuer \
-  --source . \
-  --region=us-east4 \
-  --no-build \
-  --base-image=osonly24 \
-  --command=./function
+cd function
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o function .
+SHORT_SHA=$(git rev-parse --short HEAD)
+docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} .
+docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
+gcloud run deploy gh-repo-token-issuer \
+  --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
+  --region=us-east4
 ```
 
 For canary deployments (no traffic until verified):
 
 ```bash
-gcloud beta run deploy gh-repo-token-issuer \
-  --source . \
+gcloud run deploy gh-repo-token-issuer \
+  --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
   --region=us-east4 \
-  --no-build \
-  --base-image=osonly24 \
-  --command=./function \
   --no-traffic \
   --tag=commit-$(git rev-parse --short HEAD)
 ```
@@ -221,5 +225,5 @@ gcloud auth configure-docker us-east4-docker.pkg.dev
 
 - **No Logging**: This service intentionally has no logging enabled to reduce costs and complexity
 - **Stateless**: No persistent storage; all state is managed per-request
-- **Auto-scaling**: Configured for 0-10 instances with 80 concurrent requests per instance
+- **Auto-scaling**: Configured for 0-10 instances (uses Cloud Run default concurrency)
 - **Cost Optimization**: Minimum instances set to 0 to avoid idle charges

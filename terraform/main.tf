@@ -141,6 +141,14 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
         name  = "GITHUB_APP_ID"
         value = var.github_app_id
       }
+
+      dynamic "env" {
+        for_each = length(var.github_allowed_owners) > 0 ? [1] : []
+        content {
+          name  = "GITHUB_ALLOWED_OWNERS"
+          value = join(",", var.github_allowed_owners)
+        }
+      }
     }
 
     timeout = "60s"

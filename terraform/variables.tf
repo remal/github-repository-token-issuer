@@ -1,7 +1,6 @@
 variable "project_id" {
   description = "The GCP project ID"
   type        = string
-  default     = "gh-repo-token-issuer"
 }
 
 variable "region" {
@@ -13,5 +12,10 @@ variable "region" {
 variable "github_app_id" {
   description = "The GitHub App ID"
   type        = string
-  default     = "2637135"
+}
+
+variable "github_allowed_owners" {
+  description = "List of GitHub repository owners (organizations or users) allowed to request tokens. If empty, all owners are allowed."
+  type        = list(string)
+  default     = []
 }
