@@ -49,6 +49,8 @@ jobs:
         scopes: |
           contents: write
           workflows: write
+          pull_requests: write
+          issues: write
 
     - name: Sync with template repository
       uses: remal-github-actions/sync-with-template@v3
