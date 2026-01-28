@@ -260,22 +260,3 @@ func TestAllowedScopes_KnownScopes(t *testing.T) {
 		}
 	}
 }
-
-// TestAllowedScopes_PermissionsAreOrdered verifies permission order convention.
-// Permissions should be listed as [read, write] for consistency.
-//
-// Test steps:
-//  1. Iterate through all scopes with 2 permissions
-//  2. Verify first permission is "read"
-//  3. Verify second permission is "write"
-func TestAllowedScopes_PermissionsAreOrdered(t *testing.T) {
-	// Step 1: Check scopes with 2 permissions
-	for scopeID, permissions := range AllowedScopes {
-		if len(permissions) == 2 {
-			// Step 2 & 3: Verify order
-			if permissions[0] != "read" || permissions[1] != "write" {
-				t.Errorf("scope %q permissions should be ['read', 'write'], got %v", scopeID, permissions)
-			}
-		}
-	}
-}

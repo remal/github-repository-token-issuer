@@ -3,15 +3,15 @@ package main
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
-
-	"encoding/base64"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -193,15 +193,7 @@ func ValidateScopes(scopes map[string]string) error {
 		}
 
 		// Validate permission level
-		validPermission := false
-		for _, level := range allowedLevels {
-			if permission == level {
-				validPermission = true
-				break
-			}
-		}
-
-		if !validPermission {
+		if !slices.Contains(allowedLevels, permission) {
 			return fmt.Errorf("permission '%s' not allowed for scope '%s' (allowed: %v)",
 				permission, scopeID, allowedLevels)
 		}

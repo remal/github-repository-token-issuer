@@ -7,18 +7,15 @@ import (
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
 
-func init() {
+func main() {
 	// Validate required environment variables at startup
-	appID := os.Getenv("GITHUB_APP_ID")
-	if appID == "" {
+	if os.Getenv("GITHUB_APP_ID") == "" {
 		os.Exit(1)
 	}
 
 	// Register HTTP function
 	functions.HTTP("TokenHandler", TokenHandler)
-}
 
-func main() {
 	// Start the Functions Framework
 	port := os.Getenv("PORT")
 	if port == "" {

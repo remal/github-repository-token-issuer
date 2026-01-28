@@ -11,6 +11,33 @@ import (
 // Note: Tests requiring valid GitHub OIDC tokens (signature validation) are covered by CI/CD integration.
 // Unit tests below cover request format validation that doesn't require valid tokens.
 
+// TestTokenHandler_InvalidPath tests that requests to paths other than /token are rejected.
+func TestTokenHandler_InvalidPath(t *testing.T) {
+	paths := []string{"/", "/tokens", "/token/", "/api/token", "/foo"}
+
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, path, nil)
+			w := httptest.NewRecorder()
+
+			TokenHandler(w, req)
+
+			if w.Code != http.StatusNotFound {
+				t.Errorf("TokenHandler() status = %v, want %v", w.Code, http.StatusNotFound)
+			}
+
+			var resp ErrorResponse
+			if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+				t.Fatalf("failed to unmarshal response: %v", err)
+			}
+
+			if resp.Error != "not found" {
+				t.Errorf("TokenHandler() error = %v, want 'not found'", resp.Error)
+			}
+		})
+	}
+}
+
 // TestTokenHandler_MethodNotAllowed tests that non-POST methods are rejected.
 // The token endpoint only accepts POST requests.
 func TestTokenHandler_MethodNotAllowed(t *testing.T) {
@@ -39,8 +66,8 @@ func TestTokenHandler_MethodNotAllowed(t *testing.T) {
 	}
 }
 
-// TestTokenHandler_MissingGitHubTokenHeader tests rejection of requests without X-GitHub-Token header.
-func TestTokenHandler_MissingGitHubTokenHeader(t *testing.T) {
+// TestTokenHandler_MissingAuthorizationHeader tests rejection of requests without Authorization header.
+func TestTokenHandler_MissingAuthorizationHeader(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/token?contents=read", nil)
 	w := httptest.NewRecorder()
 
@@ -55,8 +82,8 @@ func TestTokenHandler_MissingGitHubTokenHeader(t *testing.T) {
 		t.Fatalf("failed to unmarshal response: %v", err)
 	}
 
-	if !strings.Contains(resp.Error, "missing X-GitHub-Token header") {
-		t.Errorf("TokenHandler() error = %v, want containing 'missing X-GitHub-Token header'", resp.Error)
+	if !strings.Contains(resp.Error, "missing Authorization header") {
+		t.Errorf("TokenHandler() error = %v, want containing 'missing Authorization header'", resp.Error)
 	}
 }
 
@@ -73,7 +100,7 @@ func TestTokenHandler_InvalidOIDCToken(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(http.MethodPost, "/token?contents=read", nil)
-			req.Header.Set("X-GitHub-Token", tt.token)
+			req.Header.Set("Authorization", "Bearer "+tt.token)
 			w := httptest.NewRecorder()
 
 			TokenHandler(w, req)

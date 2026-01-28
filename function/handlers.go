@@ -25,6 +25,12 @@ type ErrorResponse struct {
 
 // TokenHandler handles POST /token requests.
 func TokenHandler(w http.ResponseWriter, r *http.Request) {
+	// Enforce /token path
+	if r.URL.Path != "/token" {
+		writeError(w, http.StatusNotFound, "not found", nil)
+		return
+	}
+
 	// Only allow POST method
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed", nil)
@@ -92,12 +98,8 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get GitHub App ID from environment
+	// Get GitHub App ID from environment (validated at startup in main.go)
 	appID := os.Getenv("GITHUB_APP_ID")
-	if appID == "" {
-		writeError(w, http.StatusInternalServerError, "GITHUB_APP_ID not configured", nil)
-		return
-	}
 
 	// Get GCP project ID from environment
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
