@@ -157,15 +157,16 @@ jobs:
           contents:write
         service_tag: commit-${{steps.short-sha.outputs.value}}
 
-    - name: Verify token scopes
+    - name: Verify token permissions
       run: |
-        SCOPES=$(curl -sI -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
-          https://api.github.com/user | grep -i "x-oauth-scopes:" | cut -d' ' -f2- | tr -d '\r')
-        echo "Returned scopes: $SCOPES"
-        if echo "$SCOPES" | grep -q "contents"; then
-          echo "Scope validation passed"
+        # Verify token permissions
+        PERMS=$(curl -sS -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
+          "https://api.github.com/repos/${{github.repository}}" | jq -r '.permissions.push // false')
+        echo "Push permission: $PERMS"
+        if [[ "$PERMS" == "true" ]]; then
+          echo "Permission validation passed"
         else
-          echo "Scope validation failed: expected 'contents' in scopes"
+          echo "Permission validation failed: expected push=true for contents:write"
           exit 1
         fi
 
