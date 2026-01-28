@@ -39,10 +39,11 @@ jobs:
           --region="$REGION" \
           --format='value(status.latestCreatedRevisionName)')
 
-        # Get revisions serving traffic
+        # Get revisions serving traffic (>0%)
         TRAFFIC_REVISIONS=$(gcloud run services describe "$SERVICE" \
           --region="$REGION" \
-          --format='value(status.traffic[].revisionName)' | tr ';' '\n')
+          --format='json(status.traffic)' | \
+          jq -r '.status.traffic[] | select(.percent > 0) | .revisionName')
 
         # List all revisions with creation time
         ALL_REVISIONS=$(gcloud run revisions list \
