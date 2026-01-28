@@ -61,7 +61,7 @@ action.yml    # Composite action in root
 - Keep Table of Contents updated in README.md and DEVELOPMENT.md
 - No emojis unless explicitly requested
 - Use GitHub-flavored markdown
-- **Do not document `service_tag` action input** - this is an internal input for testing purposes only
+- **Do not document `service_tag` action input in README.md** - this is an internal input for testing; it can be documented in DEVELOPMENT.md only
 
 ### Documentation Maintenance
 
