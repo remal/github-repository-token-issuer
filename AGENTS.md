@@ -23,7 +23,7 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 
 1. **Stateless** - No database or persistent storage, all validation happens per-request
 2. **Fail Fast** - No retries, no fallbacks, immediate error responses
-3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request
+3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request (exception: JWKS is cached for 1 hour)
 4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
 
 ## Technology Stack
@@ -102,7 +102,7 @@ Check for these files both at the repository root and in affected subdirectories
 - ❌ Token revocation
 - ❌ Custom token expiration
 - ❌ Organization permissions
-- ❌ Testing infrastructure (mentioned as "will think about later")
+- ❌ Additional testing infrastructure beyond existing unit tests
 - ❌ Documentation beyond README.md, DEVELOPMENT.md, AGENTS.md
 
 ## Code Style
@@ -175,7 +175,7 @@ Check for these files both at the repository root and in affected subdirectories
 
 - Composite action at `./action.yml`
 - Inputs:
-  - `scopes` (required): multiline format, one scope:permission per line
+  - `scopes` (required): multiline format, one scope: permission per line
 - Output: `token`
 - Requires `permissions: id-token: write` in workflow
 
@@ -303,10 +303,10 @@ scopes[param] = permission
 
 ```
 function/
-├── Dockerfile     # Multi-stage build for Cloud Run
+├── Dockerfile     # Minimal image for Cloud Run
 ├── main.go        # Functions Framework entry point, startup validation
-├── handlers.go    # TokenHandler, query param parsing, response formatting
-├── validation.go  # ValidateScopes, ExtractRepositoryFromOIDC, duplicate detection
+├── handlers.go    # TokenHandler, query param parsing, duplicate detection, response formatting
+├── validation.go  # ValidateScopes, ValidateAndExtractRepository
 ├── scopes.go      # AllowedScopes map, BlacklistedScopes set
 ├── github.go      # GitHub API client, JWT creation, token issuance
 ├── go.mod         # Dependencies

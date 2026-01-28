@@ -89,7 +89,6 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
    └─> Calls validation logic
 
 3. Validation Layer (validation.go)
-   └─> Check for duplicate scopes
    └─> Validate against allowlist/blacklist (scopes.go)
    └─> Verify each scope has valid permission level
 
@@ -538,7 +537,7 @@ The function authenticates as the GitHub App using JWT:
 
 - **Algorithm**: RS256 (RSA signature with SHA-256)
 - **Expiration**: 10 minutes (GitHub's maximum)
-- **Library**: go-github's built-in JWT methods
+- **Library**: golang-jwt/jwt/v5
 - **Claims**:
   - `iat`: Issued at timestamp
   - `exp`: Expiration timestamp (iat + 10 minutes)
@@ -756,7 +755,7 @@ GITHUB_APP_ID=1 go test -v ./...
 GITHUB_APP_ID=1 go test -v -run TestValidateScopes ./...
 ```
 
-Note: `GITHUB_APP_ID` env var is required because `init()` validates it at startup.
+Note: `GITHUB_APP_ID` env var is required because `main()` validates it at startup.
 
 ## Deployment
 
@@ -968,7 +967,7 @@ This will cause validation to reject `?my_scope=write` with 400 error.
 
 #### "failed to retrieve private key from Secret Manager"
 
-**Cause**: Cloud Function service account lacks permission to read secret
+**Cause**: Cloud Run service account lacks permission to read secret
 
 **Fix**:
 

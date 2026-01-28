@@ -8,7 +8,7 @@ This directory contains the Terraform configuration for deploying the GitHub Rep
 2. **Terraform** installed (see `.terraform-version` or `terraform/main.tf` for constraints)
 3. **gcloud CLI** installed and authenticated
 4. **GitHub App** created with repository permissions
-5. **GitHub App private key** downloaded (will be stored in Secret Manager by Terraform)
+5. **GitHub App private key** downloaded (added manually to Secret Manager after Terraform creates the empty secret)
 
 ## Required GCP APIs
 
