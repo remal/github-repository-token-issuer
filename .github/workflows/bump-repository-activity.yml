@@ -53,6 +53,6 @@ jobs:
       with:
         dryRun: ${{inputs.dryRun || 'false'}}
         githubToken: ${{steps.get-token.outputs.token}}
-        maxInactivityDays: ${{inputs.maxInactivityDays}}
+        maxInactivityDays: ${{inputs.maxInactivityDays || 14}}
         bumperFile: 'repository-activity.bumper'
         commitMessage: '[push-back] Bump repository activity'
