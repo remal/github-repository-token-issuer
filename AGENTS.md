@@ -76,20 +76,21 @@ Check for these files both at the repository root and in affected subdirectories
 
 ## Security Rules (NEVER violate)
 
-1. **Repository permissions only** - Never add organization or account-level permissions
-2. **Read-only security scopes** - These must stay read-only:
+1. **No account-level permissions** - Never add account-level permissions
+2. **Organization permissions are read-only** - All organization permissions must be restricted to read-only
+3. **Read-only security scopes** - These must stay read-only:
 
 - `administration`
 - `secret_scanning`
 
-3. **No logging** of:
+4. **No logging** of:
 
 - OIDC tokens
 - GitHub App private keys
 - Installation access tokens
 - JWT tokens
 
-4. **Duplicate scope rejection** - Always return 400 if same scope appears multiple times
+5. **Duplicate scope rejection** - Always return 400 if same scope appears multiple times
 
 ## What NOT to Add (Unless Explicitly Requested)
 
@@ -101,7 +102,6 @@ Check for these files both at the repository root and in affected subdirectories
 - ❌ Metrics or observability
 - ❌ Token revocation
 - ❌ Custom token expiration
-- ❌ Organization permissions
 - ❌ Additional testing infrastructure beyond existing unit tests
 - ❌ Documentation beyond README.md, DEVELOPMENT.md, AGENTS.md
 
@@ -119,12 +119,16 @@ Check for these files both at the repository root and in affected subdirectories
 
 ## Common Tasks
 
-### Adding a New Repository Permission Scope
+### Adding a New Permission Scope
 
 1. Update `function/scopes.go` with scope ID and allowed levels
-2. Update README.md Allowed Scopes table
-3. Update DEVELOPMENT.md if needed
-4. Test and deploy via CI/CD
+2. Update `function/github.go`:
+   - Add case in `CreateInstallationToken()` switch statement
+   - Add if statement in `VerifyRequestedScopes()` function
+3. Update README.md Allowed Scopes table (repository or organization section)
+4. Update DEVELOPMENT.md if needed
+5. Run `gofmt -w .` and verify with `go vet` and `golangci-lint`
+6. Test and deploy via CI/CD
 
 ### Modifying API Behavior
 
@@ -158,8 +162,10 @@ Check for these files both at the repository root and in affected subdirectories
 **Allowlist** (in `function/scopes.go`):
 
 - 19 repository permission scopes
+- 3 organization permission scopes (read-only): `members`, `organization_secrets`, `organization_actions_variables`
 - Map of scope_id → []string{"read", "write"} or []string{"read"}
-- Security scopes are read-only
+- Security scopes (`administration`, `secret_scanning`) are read-only
+- Organization scopes are read-only
 
 **Blacklist**: Currently empty, can be used to block specific scopes
 

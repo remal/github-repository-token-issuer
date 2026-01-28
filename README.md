@@ -32,7 +32,7 @@ This app solves these problems by issuing short-lived GitHub App installation to
 - **Centralized access control**: Install the app once, use it across all repositories without duplicating secrets
 - **Easier onboarding**: New repositories can start using tokens immediately after app installation, no manual secret configuration needed
 
-**Note**: This app only issues tokens with **repository-level permissions**. Organization-level or account-level permissions are not supported.
+**Note**: This app issues tokens with **repository-level permissions** and limited **organization-level permissions** (read-only). Account-level permissions are not supported.
 
 ### Key Features
 
@@ -55,8 +55,8 @@ The repository includes a composite action (`action.yml`) that simplifies callin
 
 **Inputs**:
 
-- `scopes`: (required) Repository permission scopes in format `scope_id: permission`, one per line
-  - Use scope IDs from the [Allowed Repository Permission Scopes](#allowed-repository-permission-scopes) table
+- `scopes`: (required) Permission scopes in format `scope_id: permission`, one per line
+  - Use scope IDs from the [Allowed Scopes](#allowed-repository-permission-scopes) tables
   - Example:
     ```yaml
     scopes: |
@@ -126,8 +126,6 @@ curl -X POST \
 
 ### Allowed Repository Permission Scopes
 
-**Important**: This app only works with **repository-level permissions**. Organization-level and account-level permissions are not supported.
-
 The following repository permission scopes are allowed (use the Scope ID in your action):
 
 | Permission Name        | Scope ID             | Available Levels |
@@ -152,18 +150,30 @@ The following repository permission scopes are allowed (use the Scope ID in your
 | Secrets                | `secrets`            | read, write      |
 | Workflows              | `workflows`          | read, write      |
 
-**Note**: `secret_scanning` is restricted to read-only access for security reasons.
+**Note**: `administration` and `secret_scanning` are restricted to read-only access for security reasons.
+
+### Allowed Organization Permission Scopes
+
+The following organization permission scopes are allowed (read-only):
+
+| Permission Name                    | Scope ID                         | Available Levels |
+|------------------------------------|----------------------------------|------------------|
+| Members                            | `members`                        | read             |
+| Organization secrets               | `organization_secrets`           | read             |
+| Organization Actions variables     | `organization_actions_variables` | read             |
+
+**Note**: Organization permissions only work when the GitHub App is installed on an organization account. All organization permissions are restricted to read-only access.
 
 ### Error Code Catalog
 
 | Error Message                                        | Cause                                                         | Resolution                                                                                                                              |
 |------------------------------------------------------|---------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------|
 | `duplicate scope 'X' in request`                     | Same scope appears multiple times in query params             | Remove duplicate scopes - each scope should appear only once                                                                            |
-| `scope 'X' is not allowed`                           | Requested scope is blacklisted or not a repository permission | Check the [Allowed Repository Permission Scopes](#allowed-repository-permission-scopes) table for valid repository permission scope IDs |
-| `scope 'X' is not in allowlist`                      | Requested scope ID is not recognized                          | Use a valid scope ID from the [Allowed Repository Permission Scopes](#allowed-repository-permission-scopes) table                       |
+| `scope 'X' is not allowed`                           | Requested scope is blacklisted or not an allowed permission   | Check the allowed scopes tables for valid scope IDs                                                                                     |
+| `scope 'X' is not in allowlist`                      | Requested scope ID is not recognized                          | Use a valid scope ID from the allowed scopes tables                                                                                     |
 | `repository owner 'X' is not allowed`                | Repository owner not in configured allowlist                  | Contact administrator to add owner to GITHUB_ALLOWED_OWNERS                                                                             |
 | `GitHub App is not installed on repository`          | App not installed on the target repository                    | Install the GitHub App on the repository in GitHub settings                                                                             |
-| `insufficient permissions for scope 'X'`             | App doesn't have repository permission for requested scope    | Update GitHub App's repository permissions or request fewer scopes                                                                      |
+| `insufficient permissions for scope 'X'`             | App doesn't have the requested permission granted             | Update GitHub App's permissions or request fewer scopes                                                                                 |
 | `GitHub API returned fewer scopes than requested`    | Repository-level restrictions limit available scopes          | Check repository settings and branch protection rules                                                                                   |
 | `GitHub App installation is suspended`               | App has been suspended                                        | Check GitHub App status and resolve suspension                                                                                          |
 | `failed to retrieve private key from Secret Manager` | Secret Manager unavailable or misconfigured                   | Verify Secret Manager permissions and secret exists                                                                                     |

@@ -165,6 +165,12 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 			permissions.Statuses = permValue
 		case "workflows":
 			permissions.Workflows = permValue
+		case "members":
+			permissions.Members = permValue
+		case "organization_secrets":
+			permissions.OrganizationSecrets = permValue
+		case "organization_actions_variables":
+			permissions.OrganizationActionsVariables = permValue
 		default:
 			return nil, fmt.Errorf("unknown scope ID: %s", scopeID)
 		}
@@ -258,6 +264,15 @@ func VerifyRequestedScopes(requested map[string]string, granted *github.Installa
 	}
 	if granted.Workflows != nil {
 		grantedMap["workflows"] = *granted.Workflows
+	}
+	if granted.Members != nil {
+		grantedMap["members"] = *granted.Members
+	}
+	if granted.OrganizationSecrets != nil {
+		grantedMap["organization_secrets"] = *granted.OrganizationSecrets
+	}
+	if granted.OrganizationActionsVariables != nil {
+		grantedMap["organization_actions_variables"] = *granted.OrganizationActionsVariables
 	}
 
 	// Check if all requested scopes were granted

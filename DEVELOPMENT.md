@@ -168,7 +168,8 @@ terraform/             # Infrastructure as Code
 
 - `AllowedScopes`: Map of scope ID → allowed levels (read, write, or both)
 - `BlacklistedScopes`: Set of forbidden scopes
-- Read-only restrictions for security scopes (secret_scanning)
+- Read-only restrictions for security scopes (`administration`, `secret_scanning`)
+- Organization permissions (read-only): `members`, `organization_secrets`, `organization_actions_variables`
 
 #### `function/github.go`
 
@@ -590,10 +591,11 @@ Currently, all repository permissions at their specified levels are allowed. The
 
 When parsing query parameters:
 
-- Each scope must be a valid repository permission scope ID
+- Each scope must be a valid permission scope ID (repository or organization level)
 - Each scope can have either `read` or `write` permission (as specified in the allowed levels)
 - Each scope must appear only once; duplicate scopes result in **400 Bad Request**
-- Only repository-level permissions are supported; organization or account permissions are not allowed
+- Organization permissions are restricted to read-only access
+- Account-level permissions are not supported
 - This strict validation helps catch misconfigured actions early
 
 ### Error Handling Strategy Details
@@ -1076,11 +1078,7 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 
 - Tradeoff: Distributed locking complexity
 
-4. **Support for organization permissions**: Expand beyond repository permissions
-
-- Tradeoff: Significantly more complex permission model
-
-5. **Custom token expiration**: Let caller specify expiry up to 1 hour
+4. **Custom token expiration**: Let caller specify expiry up to 1 hour
 
 - Tradeoff: More validation logic, potential security risk
 

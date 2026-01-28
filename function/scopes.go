@@ -1,9 +1,9 @@
 package main
 
-// AllowedScopes defines repository permission scopes and their allowed permission levels.
-// Only repository-level permissions are supported; organization and account permissions are not allowed.
+// AllowedScopes defines permission scopes and their allowed permission levels.
+// Supports both repository-level and organization-level permissions.
 var AllowedScopes = map[string][]string{
-	// Read and write permissions
+	// Repository permissions (read and write)
 	"actions":            {"read", "write"},
 	"attestations":       {"read", "write"},
 	"checks":             {"read", "write"},
@@ -22,9 +22,14 @@ var AllowedScopes = map[string][]string{
 	"statuses":           {"read", "write"},
 	"workflows":          {"read", "write"},
 
-	// Read-only permissions (security and administrative)
+	// Repository permissions (read-only for security)
 	"administration":  {"read"}, // Repository administration settings
 	"secret_scanning": {"read"}, // Secret scanning alerts
+
+	// Organization permissions (read-only)
+	"members":                        {"read"}, // Organization members and teams
+	"organization_secrets":           {"read"}, // Organization-level secrets
+	"organization_actions_variables": {"read"}, // Organization-level Actions variables
 }
 
 // BlacklistedScopes defines scopes that are explicitly forbidden.
