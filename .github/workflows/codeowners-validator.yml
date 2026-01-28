@@ -22,7 +22,6 @@ concurrency:
 
 jobs:
   codeowners-validation:
-    name: Check rate limits
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -41,7 +40,7 @@ jobs:
 
     - name: Get GitHub Token
       id: get-token
-      uses: remal/github-repository-token-issuer/actions@v1
+      uses: remal/github-repository-token-issuer@v1
       with:
         permissions: |
           contents: read
