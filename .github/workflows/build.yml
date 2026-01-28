@@ -154,7 +154,7 @@ jobs:
       uses: ./
       with:
         scopes: |
-          statuses:write
+          statuses: write
         service_tag: commit-${{steps.short-sha.outputs.value}}
 
     - name: Verify token has write access

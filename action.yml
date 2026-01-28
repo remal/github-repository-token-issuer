@@ -53,8 +53,8 @@ runs:
         QUERY=""
         while IFS= read -r line; do
           [[ -z "$line" ]] && continue
-          SCOPE_ID="${line%%:*}"
-          PERMISSION="${line##*:}"
+          SCOPE_ID=$(echo "${line%%:*}" | xargs)
+          PERMISSION=$(echo "${line##*:}" | xargs)
           [[ -n "$QUERY" ]] && QUERY="${QUERY}&"
           QUERY="${QUERY}${SCOPE_ID}=${PERMISSION}"
         done <<< "${{ inputs.scopes }}"
