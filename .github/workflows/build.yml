@@ -160,8 +160,11 @@ jobs:
     - name: Verify token permissions
       run: |
         # Verify token permissions
-        PERMS=$(curl -sS -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
-          "https://api.github.com/repos/${{github.repository}}" | jq -r '.permissions.push // false')
+        RESPONSE=$(curl -sS -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
+          "https://api.github.com/repos/${{github.repository}}")
+        echo "Full response:"
+        echo "$RESPONSE" | jq '.permissions'
+        PERMS=$(echo "$RESPONSE" | jq -r '.permissions.push // false')
         echo "Push permission: $PERMS"
         if [[ "$PERMS" == "true" ]]; then
           echo "Permission validation passed"
