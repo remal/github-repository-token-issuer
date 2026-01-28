@@ -123,6 +123,7 @@ func TestTokenHandler_InvalidOIDCToken(t *testing.T) {
 
 // TestTokenHandler_ContentTypeHeader tests that all responses have JSON content type.
 func TestTokenHandler_ContentTypeHeader(t *testing.T) {
+	// Test that even error responses have JSON content type
 	req := httptest.NewRequest(http.MethodGet, "/token", nil)
 	w := httptest.NewRecorder()
 
