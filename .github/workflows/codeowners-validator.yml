@@ -42,7 +42,7 @@ jobs:
       id: get-token
       uses: remal/github-repository-token-issuer@v1
       with:
-        permissions: |
+        scopes: |
           contents: read
           ${{steps.owner-type.outputs.owner-type == 'organization' && 'members:read' || ''}}
 
