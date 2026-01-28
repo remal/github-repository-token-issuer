@@ -45,6 +45,7 @@ node_modules/
 *.tfstate
 *.tfstate.backup
 *.tfstate.lock.info
+#*.tfvars
 *.tfvars.backup
 .terraform/
 
