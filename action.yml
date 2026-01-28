@@ -21,6 +21,7 @@ runs:
     - name: Check dependencies
       shell: bash
       run: |
+        # Check dependencies
         missing=()
         command -v curl &>/dev/null || missing+=("curl")
         command -v jq &>/dev/null || missing+=("jq")
@@ -33,6 +34,7 @@ runs:
       id: oidc
       shell: bash
       run: |
+        # Get GitHub OIDC Token
         RESPONSE=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
           "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer")
         if ! OIDC_TOKEN=$(echo "$RESPONSE" | jq -r '.value // empty' 2>/dev/null) || [[ -z "$OIDC_TOKEN" ]]; then
@@ -47,6 +49,7 @@ runs:
       id: scopes
       shell: bash
       run: |
+        # Convert scopes to query params
         QUERY=""
         while IFS= read -r line; do
           [[ -z "$line" ]] && continue
@@ -61,6 +64,7 @@ runs:
       id: get-token
       shell: bash
       run: |
+        # Request Installation Token
         if [[ -n "${{ inputs.service_tag }}" ]]; then
           SERVICE_URL="https://${{ inputs.service_tag }}---gh-repo-token-issuer-db7udto7gq-uk.a.run.app"
         else
