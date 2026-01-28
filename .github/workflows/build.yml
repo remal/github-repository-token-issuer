@@ -154,20 +154,23 @@ jobs:
       uses: ./
       with:
         scopes: |
-          contents:write
+          statuses:write
         service_tag: commit-${{steps.short-sha.outputs.value}}
 
-    - name: Verify token works
+    - name: Verify token has write access
       run: |
-        # Verify token can access repo contents (proves contents permission works)
-        HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+        # Verify statuses:write by creating a commit status
+        HTTP_CODE=$(curl -sS -o /tmp/status-response.json -w "%{http_code}" \
+          -X POST \
           -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
-          "https://api.github.com/repos/${{github.repository}}/contents/README.md")
-        echo "HTTP status: $HTTP_CODE"
-        if [[ "$HTTP_CODE" == "200" ]]; then
-          echo "Token validation passed - can read repo contents"
+          -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${{github.repository}}/statuses/${{github.sha}}" \
+          -d '{"state":"success","context":"token-validation","description":"Installation token write access verified"}')
+        if [[ "$HTTP_CODE" == "201" ]]; then
+          echo "Token validation passed - statuses:write verified"
         else
-          echo "Token validation failed: expected 200, got $HTTP_CODE"
+          echo "Token validation failed (HTTP $HTTP_CODE):"
+          cat /tmp/status-response.json
           exit 1
         fi
 
