@@ -17,7 +17,6 @@ includes:
 excludes:
 - '.github/workflows/*template*-cleanup.*'
 - '.github/*template*-cleanup/**'
-- '.github/workflows/check-action-secrets.yml'
 - '.github/workflows/release-drafter.yml'
 - '.github/release-drafter.yml'
 modifiable-sections-exclusions:
