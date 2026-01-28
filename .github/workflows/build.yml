@@ -183,11 +183,11 @@ jobs:
           --to-tags=commit-${SHORT_SHA}=100
 
     - name: Read project version
-      if: ${{github.event_name == 'push' && github.ref == 'refs/heads/main'}}
+      if: ${{github.ref == 'refs/heads/main'}}
       id: project-version
       run: echo "version=$(cat .version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
     - name: Create tag
-      if: ${{github.event_name == 'push' && github.ref == 'refs/heads/main'}}
+      if: ${{github.ref == 'refs/heads/main'}}
       uses: remal-github-actions/create-tag@v2
       with:
         tagName: 'v${{steps.project-version.outputs.version}}'
