@@ -12,7 +12,7 @@ A secure, serverless GitHub App hosted on Google Cloud Platform that issues shor
 
 ## Overview
 
-This GitHub App provides a secure mechanism for GitHub Actions workflows to obtain short-lived GitHub installation tokens with specific scopes and permissions. The app runs as a Cloud Run service on GCP and authenticates callers using GitHub's OIDC tokens integrated with GCP IAM.
+This GitHub App provides a secure mechanism for GitHub Actions workflows to obtain short-lived GitHub installation tokens with specific scopes and permissions. The app runs as a Cloud Run service on GCP and authenticates callers by validating GitHub OIDC tokens directly.
 
 ### Why Use This?
 
@@ -37,7 +37,7 @@ This app solves these problems by issuing short-lived GitHub App installation to
 ### Key Features
 
 - Serverless Cloud Run service for automatic scaling
-- GitHub OIDC token validation via GCP IAM
+- Direct GitHub OIDC token validation (no GCP IAM required for callers)
 - Scope allowlisting and blacklisting for security
 - Simple API with query parameter-based scope specification
 - Automated CI/CD pipeline using GitHub Actions and Terraform
@@ -113,33 +113,20 @@ jobs:
 
 ### Manual API Call (for testing)
 
-The service requires two forms of authentication:
-1. **GCP authentication** via Workload Identity Federation (for Cloud Run invocation)
-2. **GitHub OIDC token** in `X-GitHub-Token` header (for repository identification)
+The service authenticates callers using GitHub OIDC tokens. The token is validated by the function itself (signature verification against GitHub's JWKS, issuer, audience, and expiration).
 
 ```bash
-# 1. Obtain GitHub OIDC token
-# The audience must match the oidc_audience configured in Workload Identity Pool Provider
+# 1. Obtain GitHub OIDC token (audience must be 'gh-repo-token-issuer')
 GITHUB_OIDC_TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
   "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" | jq -r .value)
 
-# 2. Exchange GitHub OIDC token for GCP access token via STS API
-GCP_ACCESS_TOKEN=$(curl -sS -X POST \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-  --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
-  --data-urlencode "subject_token=${GITHUB_OIDC_TOKEN}" \
-  --data-urlencode "audience=//iam.googleapis.com/projects/<PROJECT_NUMBER>/locations/global/workloadIdentityPools/users-github-actions/providers/users-github-oidc" \
-  "https://sts.googleapis.com/v1/token" | jq -r .access_token)
-
-# 3. Call the function with both tokens
+# 2. Call the function with the OIDC token
 curl -X POST \
-  -H "Authorization: Bearer ${GCP_ACCESS_TOKEN}" \
-  -H "X-GitHub-Token: ${GITHUB_OIDC_TOKEN}" \
+  -H "Authorization: Bearer ${GITHUB_OIDC_TOKEN}" \
   "https://gh-repo-token-issuer-xyz.run.app/token?contents=write&deployments=write&statuses=write"
 ```
 
-**Note**: Replace `<PROJECT_NUMBER>` with your GCP project number. The `audience` value for the GitHub OIDC token must match the `oidc_audience` Terraform variable.
+**Note**: This endpoint is only accessible from GitHub Actions workflows. The OIDC token proves the request originated from a specific repository's workflow.
 
 ### Allowed Repository Permission Scopes
 

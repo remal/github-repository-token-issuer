@@ -56,13 +56,7 @@ Edit `terraform.tfvars`:
 project_id    = "your-gcp-project-id"
 region        = "us-east4"
 github_app_id = "123456"  # Your GitHub App ID
-oidc_audience = "gh-repo-token-issuer"  # Required: OIDC audience for Workload Identity
-
-# Optional: Restrict which repositories can authenticate
-# workload_identity_additional_condition = "attribute.repository.startsWith('myorg/')"
 ```
-
-**Note**: The `oidc_audience` value must match the `audience` parameter used when requesting OIDC tokens in GitHub Actions workflows.
 
 ### 3. Initialize Terraform
 
@@ -103,9 +97,7 @@ This configuration creates the following GCP resources:
 - **Service Account** (`gh-repo-token-issuer-sa`) - Identity for Cloud Run
 - **Artifact Registry Repository** - Docker container registry
 - **Secret Manager Secret** (`github-app-private-key`) - Stores GitHub App private key
-- **Workload Identity Pool** (`users-github-actions`) - For GitHub OIDC authentication
-- **Workload Identity Pool Provider** (`users-github-oidc`) - GitHub OIDC configuration
-- **IAM Bindings** - Permissions for Cloud Run invocation and Secret Manager access
+- **IAM Bindings** - Public access for Cloud Run invocation and Secret Manager access for service account
 
 ### Resource Dependency Diagram
 
@@ -114,56 +106,37 @@ This configuration creates the following GCP resources:
         ┌───────────────────────┼───────────────────────┐
         │                       │                       │
         v                       v                       v
-   run.googleapis.com    secretmanager.googleapis.com   iamcredentials.googleapis.com
+   run.googleapis.com    secretmanager.googleapis.com   artifactregistry.googleapis.com
         │                       │                       │
-        │                       │                       v
-        │                       │            ┌────────────────────────────┐
-        │                       │            │ Workload Identity          │
-        │                       │            │ Pool (users-github-actions)│
-        │                       │            └──────────┬─────────────────┘
-        │                       │                       │
-        │                       │                       v
-        │                       │            ┌───────────────────────┐
-        │                       │            │ Workload Identity     │
-        │                       │            │ (users-github-oidc)   │
-        │                       │            └──────────┬────────────┘
-        │                       │                       │
-        v                       v                       │
-   ┌─────────┐          ┌─────────────┐                 │
-   │Artifact │          │ Service     │                 │
-   │Registry │          │ Account     │                 │
-   └────┬────┘          │ (cloud_run_sa)                │
-        │               └──────┬──────┘                 │
-        │                      │                        │
-        │    ┌─────────────────┼────────────────────────┘
-        │    │                 │
-        │    │                 v
-        │    │    ┌────────────────────────┐
-        │    │    │ Secret Manager Secret  │
-        │    │    │ (github-app-private-key)│
-        │    │    └───────────┬────────────┘
-        │    │                │
-        │    │                v
-        │    │    ┌────────────────────────┐
-        │    │    │ Secret Manager IAM     │
-        │    │    │ (secretAccessor role)  │
-        │    │    └────────────────────────┘
-        │    │                │
-        v    v                │
-   ┌───────────────────────┐  │
-   │ Cloud Run Service     │<─┘
-   │ (gh-repo-token-issuer)│
-   └──────────┬────────────┘
-              │
-              v
-   ┌───────────────────────┐
-   │ Cloud Run IAM         │<─── Workload Identity Pool (invoker permission)
-   │ (github_oidc_invoker) │
-   └───────────────────────┘
+        v                       v                       v
+   ┌─────────────┐       ┌─────────────┐          ┌─────────┐
+   │ Service     │       │ Secret      │          │Artifact │
+   │ Account     │       │ Manager     │          │Registry │
+   │(cloud_run_sa)       │ Secret      │          └────┬────┘
+   └──────┬──────┘       └──────┬──────┘               │
+          │                     │                      │
+          │                     v                      │
+          │         ┌────────────────────────┐         │
+          │         │ Secret Manager IAM     │         │
+          │         │ (secretAccessor role)  │         │
+          │         └────────────────────────┘         │
+          │                     │                      │
+          v                     v                      v
+   ┌───────────────────────────────────────────────────────┐
+   │ Cloud Run Service (gh-repo-token-issuer)              │
+   └───────────────────────┬───────────────────────────────┘
+                           │
+                           v
+   ┌───────────────────────────────────────────────────────┐
+   │ Cloud Run IAM (public_invoker)                        │
+   │ member = "allUsers" (public access)                   │
+   │ Security enforced by function via OIDC token validation│
+   └───────────────────────────────────────────────────────┘
 
 Notes:
    - Secret has prevent_destroy lifecycle (won't be deleted on terraform destroy)
    - Secret version (private key value) is added manually via gcloud
+   - Service is publicly accessible; security is enforced by GitHub OIDC token validation
 ```
 
 ## Deploying Code Changes
@@ -199,8 +172,6 @@ After deployment, Terraform provides:
 
 - `cloud_run_url` - The HTTPS endpoint for your service
 - `service_account_email` - The service account email
-- `artifact_registry_repository` - The container registry URL
-- `workload_identity_pool_provider` - The Workload Identity Federation provider name
 
 ## Updating Configuration
 
@@ -244,16 +215,6 @@ Ensure you're in the correct directory and have the proper permissions:
 
 ```bash
 gcloud auth configure-docker us-east4-docker.pkg.dev
-```
-
-### Workload Identity Federation Issues
-
-Verify the Workload Identity Federation configuration:
-
-```bash
-gcloud iam workload-identity-pools describe users-github-actions \
-  --location=global \
-  --format=json
 ```
 
 ## Notes

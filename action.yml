@@ -43,25 +43,6 @@ runs:
         echo "::add-mask::$OIDC_TOKEN"
         echo "token=$OIDC_TOKEN" >> $GITHUB_OUTPUT
 
-    - name: Exchange for GCP Token
-      id: gcp
-      shell: bash
-      run: |
-        RESPONSE=$(curl -sS -X POST \
-          -H "Content-Type: application/x-www-form-urlencoded" \
-          --data-urlencode "grant_type=urn:ietf:params:oauth:grant-type:token-exchange" \
-          --data-urlencode "subject_token_type=urn:ietf:params:oauth:token-type:jwt" \
-          --data-urlencode "subject_token=${{ steps.oidc.outputs.token }}" \
-          --data-urlencode "audience=//iam.googleapis.com/projects/74155037973/locations/global/workloadIdentityPools/users-github-actions/providers/users-github-oidc" \
-          "https://sts.googleapis.com/v1/token")
-        if ! GCP_TOKEN=$(echo "$RESPONSE" | jq -r '.access_token // empty' 2>/dev/null) || [[ -z "$GCP_TOKEN" ]]; then
-          echo "Error: Failed to exchange GitHub OIDC token for GCP access token"
-          echo "$RESPONSE"
-          exit 1
-        fi
-        echo "::add-mask::$GCP_TOKEN"
-        echo "token=$GCP_TOKEN" >> $GITHUB_OUTPUT
-
     - name: Convert scopes to query params
       id: scopes
       shell: bash
@@ -86,8 +67,7 @@ runs:
           SERVICE_URL="https://gh-repo-token-issuer-db7udto7gq-uk.a.run.app"
         fi
         RESPONSE=$(curl -sS -X POST \
-          -H "Authorization: Bearer ${{ steps.gcp.outputs.token }}" \
-          -H "X-GitHub-Token: ${{ steps.oidc.outputs.token }}" \
+          -H "Authorization: Bearer ${{ steps.oidc.outputs.token }}" \
           "${SERVICE_URL}/token?${{ steps.scopes.outputs.query }}")
         if ! TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty' 2>/dev/null); then
           echo "Error: Invalid response from token service"

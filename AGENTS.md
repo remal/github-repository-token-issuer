@@ -210,7 +210,7 @@ Standard status codes: 400, 401, 403, 500, 503 (see DEVELOPMENT.md for mappings)
 - **Query parameters for scopes**: `?scope_id=permission&scope_id=permission`
 - **No path parameters**: No `/repos/{owner}/{repo}` style paths
 - **No path validation**: Don't validate repository in URL against OIDC claims
-- **Two-token authentication**: GCP identity token for Cloud Run, GitHub OIDC token for repository identification
+- **Single-token authentication**: GitHub OIDC token for authentication and repository identification
 
 ### Request Format
 
@@ -223,8 +223,7 @@ Standard status codes: 400, 401, 403, 500, 503 (see DEVELOPMENT.md for mappings)
 **Headers**:
 
 ```
-Authorization: Bearer <GCP_ACCESS_TOKEN>
-X-GitHub-Token: <GITHUB_OIDC_TOKEN>
+Authorization: Bearer <GITHUB_OIDC_TOKEN>
 ```
 
 **No request body** - all parameters in query string
@@ -259,13 +258,13 @@ X-GitHub-Token: <GITHUB_OIDC_TOKEN>
 
 ### OIDC Token Handling
 
-- **GCP IAM validates** the GCP access token (obtained via Workload Identity Federation)
-- **Function validates** the GitHub OIDC token from X-GitHub-Token header:
+- **Function validates** the GitHub OIDC token from Authorization header (Bearer token):
   - Signature against GitHub's JWKS
   - Issuer (`https://token.actions.githubusercontent.com`)
   - Audience (`gh-repo-token-issuer`)
   - Expiration
 - **Function extracts** repository claim from validated OIDC token
+- **Service is publicly accessible** - security is enforced by OIDC token validation
 
 ### Scope Parsing
 
