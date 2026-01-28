@@ -1,0 +1,79 @@
+name: cleanup
+
+on:
+  schedule:
+  - cron: '17 3 * * *'
+  push:
+    branches:
+    - main
+    paths:
+    - .github/workflows/cleanup.yml
+  workflow_dispatch: { }
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - name: GCP - Authenticate
+      uses: google-github-actions/auth@v3
+      with:
+        workload_identity_provider: projects/74155037973/locations/global/workloadIdentityPools/github-pool/providers/remal-gh-repo-token-issuer
+        service_account: gh-remal-gh-repo-token-issuer@gh-repo-token-issuer.iam.gserviceaccount.com
+
+    - name: Install gcloud SDK
+      uses: google-github-actions/setup-gcloud@v3
+
+    - name: Cleanup old revisions
+      run: |
+        SERVICE="gh-repo-token-issuer"
+        REGION="us-east4"
+        ONE_HOUR_AGO=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
+
+        # Get the latest revision name
+        LATEST_REVISION=$(gcloud run services describe "$SERVICE" \
+          --region="$REGION" \
+          --format='value(status.latestCreatedRevisionName)')
+
+        # Get revisions serving traffic
+        TRAFFIC_REVISIONS=$(gcloud run services describe "$SERVICE" \
+          --region="$REGION" \
+          --format='value(status.traffic[].revisionName)' | tr ';' '\n')
+
+        # List all revisions with creation time
+        ALL_REVISIONS=$(gcloud run revisions list \
+          --service="$SERVICE" \
+          --region="$REGION" \
+          --format='value(name,metadata.creationTimestamp)')
+
+        # Process each revision
+        while IFS=$'\t' read -r NAME CREATED; do
+          [ -z "$NAME" ] && continue
+
+          # Check: is this the latest revision?
+          if [ "$NAME" == "$LATEST_REVISION" ]; then
+            echo "$NAME - SKIP - latest revision"
+            continue
+          fi
+
+          # Check: is this revision serving traffic?
+          if echo "$TRAFFIC_REVISIONS" | grep -q "^${NAME}$"; then
+            echo "$NAME - SKIP - serving traffic"
+            continue
+          fi
+
+          # Check: is this revision less than 1 hour old?
+          if [[ "$CREATED" > "$ONE_HOUR_AGO" ]]; then
+            echo "$NAME - SKIP - too recent (created $CREATED)"
+            continue
+          fi
+
+          echo "$NAME - DELETE - created $CREATED"
+          gcloud run revisions delete "$NAME" \
+            --region="$REGION" \
+            --quiet
+        done <<< "$ALL_REVISIONS"

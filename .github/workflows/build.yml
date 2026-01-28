@@ -92,6 +92,9 @@ jobs:
         workload_identity_provider: projects/74155037973/locations/global/workloadIdentityPools/github-pool/providers/remal-gh-repo-token-issuer
         service_account: gh-remal-gh-repo-token-issuer@gh-repo-token-issuer.iam.gserviceaccount.com
 
+    - name: Install gcloud SDK
+      uses: google-github-actions/setup-gcloud@v3
+
     - name: Terraform - Read version
       if: ${{github.ref == 'refs/heads/main'}}
       id: terraform-version
@@ -122,9 +125,6 @@ jobs:
         GOOS: linux
         GOARCH: amd64
       run: go build -ldflags="-s -w" -o function .
-
-    - name: Install gcloud SDK
-      uses: google-github-actions/setup-gcloud@v3
 
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker us-east4-docker.pkg.dev --quiet
