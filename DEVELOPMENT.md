@@ -160,7 +160,7 @@ terraform/             # Infrastructure as Code
 
 #### `function/validation.go`
 
-- `ValidateScopes()`: Check for duplicates, allowlist/blacklist
+- `ValidateScopes()`: Check allowlist/blacklist and permission levels
 - `ValidateAndExtractRepository()`: Validate OIDC token and extract repository claim
 - OIDC token signature validation against GitHub's JWKS
 - Issuer, audience, and expiration validation
@@ -173,13 +173,12 @@ terraform/             # Infrastructure as Code
 
 #### `function/github.go`
 
-- `NewGitHubClient()`: Initialize go-github SDK client
+- `NewGitHubClientWithJWT()`: Create GitHub client with JWT authentication
 - `GetPrivateKey()`: Fetch from Secret Manager
 - `CreateJWT()`: Sign JWT with private key (RS256)
 - `GetInstallationID()`: Lookup installation for repository
-- `GetInstallationPermissions()`: Query granted permissions
 - `CreateInstallationToken()`: Request token from GitHub API
-- `VerifyRequestedScopes()`: Compare requested vs granted
+- `VerifyRequestedScopes()`: Verify granted permissions match requested
 
 ## Implementation Details
 
