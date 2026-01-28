@@ -1078,8 +1078,4 @@ echo "$OIDC_TOKEN" | cut -d. -f2 | base64 -d | jq
 
 - Tradeoff: Distributed locking complexity
 
-4. **Custom token expiration**: Let caller specify expiry up to 1 hour
-
-- Tradeoff: More validation logic, potential security risk
-
 **Philosophy**: Keep it simple. Only add features if they're clearly needed.
