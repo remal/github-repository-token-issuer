@@ -115,6 +115,7 @@ Check for these files both at the repository root and in affected subdirectories
 - **Formatting**: Run `gofmt -w .` after making changes to Go code
 - **Terraform Formatting**: Run `terraform fmt -recursive` after making changes to Terraform files
 - **Linting**: Run both `go vet ./...` and `golangci-lint run ./...` after code is changed
+- **Commit messages**: Do not use conventional commit prefixes (feat:, fix:, chore:, etc.). Write plain descriptive messages.
 
 ## Common Tasks
 
