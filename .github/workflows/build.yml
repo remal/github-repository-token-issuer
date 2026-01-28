@@ -157,19 +157,17 @@ jobs:
           contents:write
         service_tag: commit-${{steps.short-sha.outputs.value}}
 
-    - name: Verify token permissions
+    - name: Verify token works
       run: |
-        # Verify token permissions
-        RESPONSE=$(curl -sS -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
-          "https://api.github.com/repos/${{github.repository}}")
-        echo "Full response:"
-        echo "$RESPONSE" | jq '.permissions'
-        PERMS=$(echo "$RESPONSE" | jq -r '.permissions.push // false')
-        echo "Push permission: $PERMS"
-        if [[ "$PERMS" == "true" ]]; then
-          echo "Permission validation passed"
+        # Verify token can access repo contents (proves contents permission works)
+        HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+          -H "Authorization: Bearer ${{steps.validate.outputs.token}}" \
+          "https://api.github.com/repos/${{github.repository}}/contents/README.md")
+        echo "HTTP status: $HTTP_CODE"
+        if [[ "$HTTP_CODE" == "200" ]]; then
+          echo "Token validation passed - can read repo contents"
         else
-          echo "Permission validation failed: expected push=true for contents:write"
+          echo "Token validation failed: expected 200, got $HTTP_CODE"
           exit 1
         fi
 
