@@ -55,7 +55,7 @@ The repository includes a composite action (`action.yml`) that simplifies callin
 
 **Inputs**:
 
-- `scopes`: (required) Repository permission scopes in format `scope_id:permission`, one per line
+- `scopes`: (required) Repository permission scopes in format `scope_id: permission`, one per line
   - Use scope IDs from the [Allowed Repository Permission Scopes](#allowed-repository-permission-scopes) table
   - Example:
     ```yaml

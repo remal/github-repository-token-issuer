@@ -3,7 +3,7 @@ description: 'Issues short-lived GitHub installation tokens with specific reposi
 
 inputs:
   scopes:
-    description: 'Repository permission scopes (one per line, format: scope_id:permission)'
+    description: 'Repository permission scopes (one per line, format: scope_id: permission)'
     required: true
   service_tag:
     description: 'Cloud Run service tag for canary deployments (e.g., "canary"). When set, uses the tag-specific URL.'
