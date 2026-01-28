@@ -52,7 +52,7 @@ runs:
         # Convert scopes to query params
         QUERY=""
         while IFS= read -r line; do
-          [[ -z "$line" ]] && continue
+          [[ -z "$line" || "$line" =~ ^[[:space:]]*$ ]] && continue
           SCOPE_ID=$(echo "${line%%:*}" | xargs)
           PERMISSION=$(echo "${line##*:}" | xargs)
           [[ -n "$QUERY" ]] && QUERY="${QUERY}&"
