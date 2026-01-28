@@ -165,7 +165,8 @@ func TestAllowedScopes_ReadWriteScopesHaveBoth(t *testing.T) {
 //  3. Verify counts match
 func TestAllowedScopes_ExpectedCount(t *testing.T) {
 	// Step 1: Define expected count (based on scopes.go content)
-	expectedCount := 19
+	// 19 repository scopes + 3 organization scopes (read-only)
+	expectedCount := 22
 
 	// Step 2 & 3: Verify count matches
 	if len(AllowedScopes) != expectedCount {
@@ -173,32 +174,61 @@ func TestAllowedScopes_ExpectedCount(t *testing.T) {
 	}
 }
 
-// TestAllowedScopes_NoOrganizationScopes verifies no organization-level scopes are present.
-// Only repository-level permissions are allowed per security requirements.
+// TestAllowedScopes_NoForbiddenOrganizationScopes verifies forbidden organization-level scopes are not present.
+// Only specific read-only organization scopes are allowed (members, organization_secrets, organization_actions_variables).
 //
 // Test steps:
 //  1. Define list of organization-level scopes that should NOT be present
 //  2. Iterate through each org scope
 //  3. Verify scope does NOT exist in AllowedScopes
-func TestAllowedScopes_NoOrganizationScopes(t *testing.T) {
+func TestAllowedScopes_NoForbiddenOrganizationScopes(t *testing.T) {
 	// Step 1: Define organization scopes that should be blocked
-	orgScopes := []string{
+	// Note: members, organization_secrets, and organization_actions_variables are allowed (read-only)
+	forbiddenOrgScopes := []string{
 		"organization_administration",
 		"organization_custom_roles",
 		"organization_hooks",
 		"organization_packages",
 		"organization_plan",
 		"organization_projects",
-		"organization_secrets",
 		"organization_self_hosted_runners",
 		"organization_user_blocking",
-		"members",
 	}
 
 	// Step 2 & 3: Verify none of these exist
-	for _, orgScope := range orgScopes {
+	for _, orgScope := range forbiddenOrgScopes {
 		if _, exists := AllowedScopes[orgScope]; exists {
 			t.Errorf("organization scope %q should not be in AllowedScopes", orgScope)
+		}
+	}
+}
+
+// TestAllowedScopes_OrganizationScopesAreReadOnly verifies allowed organization scopes are read-only.
+// Organization scopes must only allow read access per security requirements.
+//
+// Test steps:
+//  1. Define list of allowed organization scopes
+//  2. Iterate through each org scope
+//  3. Verify scope exists and only allows "read" permission
+func TestAllowedScopes_OrganizationScopesAreReadOnly(t *testing.T) {
+	// Step 1: Define allowed organization scopes (must be read-only)
+	readOnlyOrgScopes := []string{
+		"members",
+		"organization_secrets",
+		"organization_actions_variables",
+	}
+
+	// Step 2: Check each organization scope
+	for _, scopeID := range readOnlyOrgScopes {
+		// Step 3: Verify scope exists and is read-only
+		permissions, exists := AllowedScopes[scopeID]
+		if !exists {
+			t.Errorf("expected organization scope %q not found in AllowedScopes", scopeID)
+			continue
+		}
+
+		if len(permissions) != 1 || permissions[0] != "read" {
+			t.Errorf("organization scope %q should only allow 'read', got %v", scopeID, permissions)
 		}
 	}
 }
