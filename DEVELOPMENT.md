@@ -908,7 +908,7 @@ gcloud run services update-traffic gh-repo-token-issuer \
   --to-tags=commit-${SHORT_SHA}=100
 ```
 
-**Note**: CI/CD performs automated canary validation using the composite action with `service_tag` input to test the canary revision, then verifies `X-OAuth-Scopes` header via GitHub API before migrating traffic.
+**Note**: CI/CD performs automated canary validation using the composite action to test the canary revision, then verifies `X-OAuth-Scopes` header via GitHub API before migrating traffic.
 
 ### CI/CD Pipeline
 
@@ -921,7 +921,7 @@ gcloud run services update-traffic gh-repo-token-issuer \
 5. **Go Build**: Build Linux binary with `CGO_ENABLED=0`
 6. **Docker Build/Push**: Build image and push to Artifact Registry
 7. **Deploy (no traffic)**: Deploy new revision with `--no-traffic --tag=commit-<SHA>`
-8. **Validate**: Use composite action with `service_tag` to request token from canary, verify `X-OAuth-Scopes` via GitHub API
+8. **Validate**: Use composite action to request token from canary, verify `X-OAuth-Scopes` via GitHub API
 9. **Migrate traffic**: Route 100% traffic to new revision if validation passes
 
 **Triggered on**: Push to `main` branch

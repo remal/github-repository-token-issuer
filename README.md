@@ -26,7 +26,7 @@ GitHub Actions workflows typically use the built-in `GITHUB_TOKEN`, but it has s
 This app solves these problems by issuing short-lived GitHub App installation tokens that:
 
 - **Trigger workflows**: Operations performed with these tokens trigger GitHub Actions normally
-- **Fine-grained repository permissions**: Request only the specific repository-level scopes you need (e.g., `issues:write`, `pull_requests:read`, `deployments:write`)
+- **Fine-grained repository permissions**: Request only the specific repository-level scopes you need (e.g., `issues: write`, `pull_requests: read`, `deployments: write`)
 - **Enhanced security**: Short-lived tokens (1 hour expiration) minimize exposure risk
 - **No secret management required**: Just install the GitHub App on your repositories and use the action - no need to create, store, or rotate tokens in GitHub Secrets
 - **Centralized access control**: Install the app once, use it across all repositories without duplicating secrets
@@ -60,14 +60,10 @@ The repository includes a composite action (`action.yml`) that simplifies callin
   - Example:
     ```yaml
     scopes: |
-      issues:write
-      pull_requests:read
-      deployments:write
+      issues: write
+      pull_requests: read
+      deployments: write
     ```
-- `service_tag`: (optional) Cloud Run service tag for canary deployments
-  - When set, uses the tag-specific URL (e.g., `https://<tag>---gh-repo-token-issuer-...`)
-  - Used for testing new deployments before migrating traffic
-
 **Outputs**:
 
 - `token`: The issued GitHub installation token
@@ -93,9 +89,9 @@ jobs:
       uses: remal/github-repository-token-issuer@main
       with:
         scopes: |
-          contents:write
-          deployments:write
-          statuses:write
+          contents: write
+          deployments: write
+          statuses: write
 
     - name: Use Token
       env:
