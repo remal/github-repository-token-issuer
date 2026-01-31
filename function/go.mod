@@ -5,7 +5,7 @@ go 1.25
 require (
 	cloud.google.com/go/secretmanager v1.16.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-github/v81 v81.0.0
 )
 
