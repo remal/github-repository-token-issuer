@@ -72,6 +72,7 @@ runs:
         fi
         RESPONSE=$(curl -sS -X POST \
           -H "Authorization: Bearer ${{ steps.oidc.outputs.token }}" \
+          -H "Content-Length: 0" \
           "${SERVICE_URL}/token?${{ steps.scopes.outputs.query }}")
         if ! TOKEN=$(echo "$RESPONSE" | jq -r '.token // empty' 2>/dev/null); then
           echo "Error: Invalid response from token service"
