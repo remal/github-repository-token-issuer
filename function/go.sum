@@ -8,8 +8,8 @@ cloud.google.com/go/compute/metadata v0.9.0 h1:pDUj4QMoPejqq20dK0Pg2N4yG9zIkYGdB
 cloud.google.com/go/compute/metadata v0.9.0/go.mod h1:E0bWwX5wTnLPedCKqk3pJmVgCBSM6qQI1yTBdEb3C10=
 cloud.google.com/go/functions v1.21.0 h1:16ViG3LpWYNgiEf1Ke6HD3x6kklvAjM22BxASxklXmo=
 cloud.google.com/go/functions v1.21.0/go.mod h1:t40GeqBAQNuqKlHCxmV/pxhyYJnImLcvRa3GBv4tAy0=
-cloud.google.com/go/iam v1.7.0 h1:JD3zh0C6LHl16aCn5Akff0+GELdp1+4hmh6ndoFLl8U=
-cloud.google.com/go/iam v1.7.0/go.mod h1:tetWZW1PD/m6vcuY2Zj/aU0eCHNPuxedbnbRTyKXvdY=
+cloud.google.com/go/iam v1.8.0 h1:e5QOdN1zQ3MTWYtXIf2buX+jxqvo2sKqBCOLrteLd1M=
+cloud.google.com/go/iam v1.8.0/go.mod h1:IkWUaEeLK91WQqTKa/fi5xdHJbL49kv2j/vlAZQSJ+k=
 cloud.google.com/go/secretmanager v1.17.0 h1:rji2m9dikfOxUvYxgJ5XpSvDtwqjouqKFAPp4Hgfyto=
 cloud.google.com/go/secretmanager v1.17.0/go.mod h1:ojzpR7KA2il9qcmBYaysgHsclj8nMcCL/Hc+WYxUsGA=
 github.com/GoogleCloudPlatform/functions-framework-go v1.9.2 h1:Cev/PdoxY86bJjGwHJcpiWMhrZMVEoKp9wuEp9gCUvw=
