@@ -3,7 +3,7 @@ module github.com/your-org/github-token-issuer/function
 go 1.25.0
 
 require (
-	cloud.google.com/go/secretmanager v1.17.0
+	cloud.google.com/go/secretmanager v1.18.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/go-github/v84 v84.0.0
