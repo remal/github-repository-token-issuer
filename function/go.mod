@@ -6,7 +6,7 @@ require (
 	cloud.google.com/go/secretmanager v1.20.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/go-github/v86 v86.0.0
+	github.com/google/go-github/v87 v87.0.0
 )
 
 require (
