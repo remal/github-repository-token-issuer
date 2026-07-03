@@ -117,6 +117,8 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 
 const maxTokenCreationRetries = 5
 
+var retryBackoffBase = time.Second
+
 // CreateInstallationToken requests an installation access token from GitHub with the specified permissions.
 func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, installationID int64, scopes map[string]string) (*github.InstallationToken, error) {
 	// Build permissions map
@@ -206,7 +208,7 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 		}
 
 		if attempt < maxTokenCreationRetries-1 {
-			backoff := time.Duration(1<<uint(attempt)) * time.Second
+			backoff := time.Duration(1<<uint(attempt)) * retryBackoffBase
 			timer := time.NewTimer(backoff)
 			select {
 			case <-ctx.Done():
