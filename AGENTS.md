@@ -22,7 +22,7 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 ### Architectural Decisions
 
 1. **Stateless** - No database or persistent storage, all validation happens per-request
-2. **Fail Fast** - No retries, no fallbacks, immediate error responses
+2. **Fail Fast** - Immediate error responses, no fallbacks. Exception: transient GitHub API server errors (status >= 500) during token creation are retried with exponential backoff
 3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request (exception: JWKS is cached for 1 hour)
 4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
 
@@ -96,7 +96,7 @@ Check for these files both at the repository root and in affected subdirectories
 
 - ❌ Logging or monitoring
 - ❌ Caching (tokens, Secret Manager responses, etc.)
-- ❌ Retries or fallback logic
+- ❌ Fallback logic or retries beyond the existing token creation retry (server errors only)
 - ❌ Request deduplication
 - ❌ Health check endpoints
 - ❌ Metrics or observability
@@ -107,7 +107,7 @@ Check for these files both at the repository root and in affected subdirectories
 
 ## Code Style
 
-- **Error handling**: Fail fast, return errors immediately
+- **Error handling**: Fail fast, return errors immediately. Targeted retry with exponential backoff for transient GitHub API server errors (>= 500) during token creation only
 - **Comments**: Only where logic isn't self-evident
 - **Validation**: At system boundaries only (user input, external APIs)
 - **Abstractions**: Avoid creating them for one-time operations

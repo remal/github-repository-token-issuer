@@ -644,6 +644,8 @@ func TestGetInstallationID(t *testing.T) {
 //  3. Verify returned token matches expected value
 //  4. Verify error handling for various failure scenarios
 func TestCreateInstallationToken(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
 	ctx := context.Background()
 	testTime := time.Now().Add(1 * time.Hour)
 
@@ -742,17 +744,14 @@ func TestCreateInstallationToken(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Step 1: Create mock service
 			mock := &mockAppsService{
 				createInstallationToken: func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error) {
 					return tt.mockToken, tt.mockResp, tt.mockErr
 				},
 			}
 
-			// Step 2: Call CreateInstallationToken
 			token, err := CreateInstallationToken(ctx, mock, tt.installID, tt.scopes)
 
-			// Step 3 & 4: Verify results
 			if tt.wantErr {
 				if err == nil {
 					t.Errorf("CreateInstallationToken() error = nil, wantErr = true")
@@ -778,5 +777,136 @@ func TestCreateInstallationToken(t *testing.T) {
 				t.Errorf("CreateInstallationToken() token = %v, want %v", token.GetToken(), tt.mockToken.GetToken())
 			}
 		})
+	}
+}
+
+func TestCreateInstallationToken_RetryOn500(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
+	ctx := context.Background()
+	testTime := time.Now().Add(1 * time.Hour)
+	callCount := 0
+
+	mock := &mockAppsService{
+		createInstallationToken: func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error) {
+			callCount++
+			if callCount == 1 {
+				return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusInternalServerError}}, fmt.Errorf("internal server error")
+			}
+			return &github.InstallationToken{
+				Token:       github.Ptr("ghs_retry_success"),
+				ExpiresAt:   &github.Timestamp{Time: testTime},
+				Permissions: &github.InstallationPermissions{Contents: github.Ptr("write")},
+			}, &github.Response{Response: &http.Response{StatusCode: http.StatusCreated}}, nil
+		},
+	}
+
+	token, err := CreateInstallationToken(ctx, mock, 12345, map[string]string{"contents": "write"})
+	if err != nil {
+		t.Fatalf("CreateInstallationToken() unexpected error = %v", err)
+	}
+	if token.GetToken() != "ghs_retry_success" {
+		t.Errorf("CreateInstallationToken() token = %v, want ghs_retry_success", token.GetToken())
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount)
+	}
+}
+
+func TestCreateInstallationToken_RetryOn504(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
+	ctx := context.Background()
+	testTime := time.Now().Add(1 * time.Hour)
+	callCount := 0
+
+	mock := &mockAppsService{
+		createInstallationToken: func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error) {
+			callCount++
+			if callCount == 1 {
+				return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusGatewayTimeout}}, fmt.Errorf("gateway timeout")
+			}
+			return &github.InstallationToken{
+				Token:       github.Ptr("ghs_retry_504"),
+				ExpiresAt:   &github.Timestamp{Time: testTime},
+				Permissions: &github.InstallationPermissions{Contents: github.Ptr("write")},
+			}, &github.Response{Response: &http.Response{StatusCode: http.StatusCreated}}, nil
+		},
+	}
+
+	token, err := CreateInstallationToken(ctx, mock, 12345, map[string]string{"contents": "write"})
+	if err != nil {
+		t.Fatalf("CreateInstallationToken() unexpected error = %v", err)
+	}
+	if token.GetToken() != "ghs_retry_504" {
+		t.Errorf("CreateInstallationToken() token = %v, want ghs_retry_504", token.GetToken())
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount)
+	}
+}
+
+func TestCreateInstallationToken_RetriesExhausted(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		createInstallationToken: func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error) {
+			callCount++
+			return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusInternalServerError}}, fmt.Errorf("persistent server error")
+		},
+	}
+
+	_, err := CreateInstallationToken(ctx, mock, 12345, map[string]string{"contents": "write"})
+	if err == nil {
+		t.Fatal("CreateInstallationToken() expected error after retries exhausted")
+	}
+	if !strings.Contains(err.Error(), "failed to create installation token") {
+		t.Errorf("CreateInstallationToken() error = %v, want containing 'failed to create installation token'", err)
+	}
+	if callCount != maxTokenCreationRetries {
+		t.Errorf("expected %d calls, got %d", maxTokenCreationRetries, callCount)
+	}
+}
+
+func TestCreateInstallationToken_NoRetryOn403(t *testing.T) {
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		createInstallationToken: func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error) {
+			callCount++
+			return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusForbidden}}, fmt.Errorf("forbidden")
+		},
+	}
+
+	_, err := CreateInstallationToken(ctx, mock, 12345, map[string]string{"contents": "write"})
+	if err == nil {
+		t.Fatal("CreateInstallationToken() expected error on 403")
+	}
+	if callCount != 1 {
+		t.Errorf("expected exactly 1 call (no retry), got %d", callCount)
+	}
+}
+
+func TestCreateInstallationToken_NoRetryOn422(t *testing.T) {
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		createInstallationToken: func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error) {
+			callCount++
+			return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusUnprocessableEntity}}, fmt.Errorf("unprocessable")
+		},
+	}
+
+	_, err := CreateInstallationToken(ctx, mock, 12345, map[string]string{"contents": "write"})
+	if err == nil {
+		t.Fatal("CreateInstallationToken() expected error on 422")
+	}
+	if callCount != 1 {
+		t.Errorf("expected exactly 1 call (no retry), got %d", callCount)
 	}
 }
