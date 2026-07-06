@@ -151,7 +151,7 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
       }
     }
 
-    timeout = "60s"
+    timeout = "300s"
   }
 
   # Deployments are managed by gcloud, not Terraform

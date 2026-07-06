@@ -70,7 +70,7 @@ runs:
         else
           SERVICE_URL="https://gh-repo-token-issuer-db7udto7gq-uk.a.run.app"
         fi
-        RESPONSE=$(curl -sS --max-time 60 -X POST \
+        RESPONSE=$(curl -sS --max-time 300 -X POST \
           -H "Authorization: Bearer ${{ steps.oidc.outputs.token }}" \
           -H "Accept: application/json" \
           -H "Content-Length: 0" \
