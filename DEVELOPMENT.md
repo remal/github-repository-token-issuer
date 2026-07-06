@@ -266,7 +266,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 ### Error Handling Strategy
 
-**Fail Fast Philosophy**: Return errors immediately without retries. Exception: transient GitHub API server errors (status >= 500) during token creation are retried up to `maxTokenCreationRetries` (5) times with exponential backoff (`2^attempt` seconds: 1s, 2s, 4s, 8s, 16s). Client errors (403, 422, etc.) and network errors with a non-server response code are never retried.
+**Fail Fast Philosophy**: Return errors immediately without retries. Exception: transient GitHub API errors during installation lookup and token creation are retried up to `maxRetries` (5) times with exponential backoff (`2^attempt` seconds: 1s, 2s, 4s, 8s, 16s). Client errors (403, 422, etc.) are never retried.
 
 | Error                    | Status | When                              | Action                     |
 |--------------------------|--------|-----------------------------------|----------------------------|
@@ -280,7 +280,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 | Secret Manager error     | 500    | Can't fetch private key           | Reject request             |
 | GitHub API error         | 503    | GitHub unavailable                | Reject request             |
 
-**Targeted retries**: Only the `CreateInstallationToken` GitHub API call is retried, and only for server errors (status >= 500) or network errors (nil response). This avoids redundant Secret Manager reads, OIDC validation, and JWT creation that a full-request retry would incur. All other errors (wrong config, insufficient permissions, client errors) fail immediately.
+**Targeted retries**: Both `FindRepositoryInstallation` and `CreateInstallationToken` GitHub API calls are retried on server errors (status >= 500) or network errors (nil response). This avoids redundant Secret Manager reads, OIDC validation, and JWT creation that a full-request retry would incur. All other errors (wrong config, insufficient permissions, client errors) fail immediately.
 
 ## Security Considerations
 
@@ -597,7 +597,7 @@ When parsing query parameters:
 
 **Failure Handling**:
 
-- **GitHub API Outage**: Token creation retries up to 5 times with exponential backoff for server errors (>= 500). If all retries fail, returns 503
+- **GitHub API Outage**: Installation lookup and token creation retry up to 5 times with exponential backoff for server errors (>= 500) or network errors. If all retries fail, returns 503
 - **Secret Manager Unavailable**: Fail immediately (no caching or fallback)
 - **Archived Repository**: Attempt token issuance anyway; let GitHub API return error if necessary
 - **Suspended GitHub App Installation**: Return 403 with clear error message
