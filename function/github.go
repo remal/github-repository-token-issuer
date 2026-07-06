@@ -100,12 +100,39 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 
 	owner, repo := parts[0], parts[1]
 
-	installation, resp, err := apps.FindRepositoryInstallation(ctx, owner, repo)
-	if err != nil {
+	var installation *github.Installation
+	var lastErr error
+
+	for attempt := range maxRetries {
+		var resp *github.Response
+		installation, resp, lastErr = apps.FindRepositoryInstallation(ctx, owner, repo)
+		if lastErr == nil {
+			break
+		}
+
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
 			return 0, fmt.Errorf("GitHub App is not installed on repository %s", repository)
 		}
-		return 0, fmt.Errorf("failed to find installation: %w", err)
+
+		retryable := resp == nil || resp.StatusCode >= http.StatusInternalServerError
+		if !retryable {
+			return 0, fmt.Errorf("failed to find installation: %w", lastErr)
+		}
+
+		if attempt < maxRetries-1 {
+			backoff := time.Duration(1<<uint(attempt)) * retryBackoffBase
+			timer := time.NewTimer(backoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return 0, ctx.Err()
+			case <-timer.C:
+			}
+		}
+	}
+
+	if lastErr != nil {
+		return 0, fmt.Errorf("failed to find installation: %w", lastErr)
 	}
 
 	if installation == nil || installation.ID == nil {
@@ -115,7 +142,7 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 	return *installation.ID, nil
 }
 
-const maxTokenCreationRetries = 5
+const maxRetries = 5
 
 var retryBackoffBase = time.Second
 
@@ -187,7 +214,7 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 	var token *github.InstallationToken
 	var lastErr error
 
-	for attempt := range maxTokenCreationRetries {
+	for attempt := range maxRetries {
 		var resp *github.Response
 		token, resp, lastErr = apps.CreateInstallationToken(ctx, installationID, opts)
 		if lastErr == nil {
@@ -207,7 +234,7 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 			return nil, fmt.Errorf("failed to create installation token: %w", lastErr)
 		}
 
-		if attempt < maxTokenCreationRetries-1 {
+		if attempt < maxRetries-1 {
 			backoff := time.Duration(1<<uint(attempt)) * retryBackoffBase
 			timer := time.NewTimer(backoff)
 			select {

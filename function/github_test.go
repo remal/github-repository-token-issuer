@@ -580,11 +580,11 @@ func TestGetInstallationID(t *testing.T) {
 			errContains:  "not installed",
 		},
 		{
-			name:         "API error",
+			name:         "API error - non-retryable",
 			repository:   "owner/repo",
 			mockResponse: nil,
-			mockResp:     &github.Response{Response: &http.Response{StatusCode: http.StatusInternalServerError}},
-			mockErr:      fmt.Errorf("internal server error"),
+			mockResp:     &github.Response{Response: &http.Response{StatusCode: http.StatusBadRequest}},
+			mockErr:      fmt.Errorf("bad request"),
 			wantErr:      true,
 			errContains:  "failed to find installation",
 		},
@@ -632,6 +632,109 @@ func TestGetInstallationID(t *testing.T) {
 				t.Errorf("GetInstallationID() = %v, want %v", gotID, tt.wantID)
 			}
 		})
+	}
+}
+
+func TestGetInstallationID_RetryOnNetworkError(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		findRepoInstallation: func(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error) {
+			callCount++
+			if callCount == 1 {
+				return nil, nil, fmt.Errorf("net/http: TLS handshake timeout")
+			}
+			return &github.Installation{ID: github.Ptr(int64(12345))},
+				&github.Response{Response: &http.Response{StatusCode: http.StatusOK}}, nil
+		},
+	}
+
+	gotID, err := GetInstallationID(ctx, mock, "owner/repo")
+	if err != nil {
+		t.Fatalf("GetInstallationID() unexpected error = %v", err)
+	}
+	if gotID != 12345 {
+		t.Errorf("GetInstallationID() = %v, want 12345", gotID)
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount)
+	}
+}
+
+func TestGetInstallationID_RetryOn500(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		findRepoInstallation: func(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error) {
+			callCount++
+			if callCount == 1 {
+				return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusInternalServerError}}, fmt.Errorf("internal server error")
+			}
+			return &github.Installation{ID: github.Ptr(int64(12345))},
+				&github.Response{Response: &http.Response{StatusCode: http.StatusOK}}, nil
+		},
+	}
+
+	gotID, err := GetInstallationID(ctx, mock, "owner/repo")
+	if err != nil {
+		t.Fatalf("GetInstallationID() unexpected error = %v", err)
+	}
+	if gotID != 12345 {
+		t.Errorf("GetInstallationID() = %v, want 12345", gotID)
+	}
+	if callCount != 2 {
+		t.Errorf("expected 2 calls, got %d", callCount)
+	}
+}
+
+func TestGetInstallationID_RetriesExhausted(t *testing.T) {
+	retryBackoffBase = time.Millisecond
+	t.Cleanup(func() { retryBackoffBase = time.Second })
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		findRepoInstallation: func(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error) {
+			callCount++
+			return nil, nil, fmt.Errorf("persistent network error")
+		},
+	}
+
+	_, err := GetInstallationID(ctx, mock, "owner/repo")
+	if err == nil {
+		t.Fatal("GetInstallationID() expected error after retries exhausted")
+	}
+	if !strings.Contains(err.Error(), "failed to find installation") {
+		t.Errorf("GetInstallationID() error = %v, want containing 'failed to find installation'", err)
+	}
+	if callCount != maxRetries {
+		t.Errorf("expected %d calls, got %d", maxRetries, callCount)
+	}
+}
+
+func TestGetInstallationID_NoRetryOn404(t *testing.T) {
+	ctx := context.Background()
+	callCount := 0
+
+	mock := &mockAppsService{
+		findRepoInstallation: func(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error) {
+			callCount++
+			return nil, &github.Response{Response: &http.Response{StatusCode: http.StatusNotFound}}, fmt.Errorf("not found")
+		},
+	}
+
+	_, err := GetInstallationID(ctx, mock, "owner/repo")
+	if err == nil {
+		t.Fatal("GetInstallationID() expected error on 404")
+	}
+	if callCount != 1 {
+		t.Errorf("expected exactly 1 call (no retry), got %d", callCount)
 	}
 }
 
@@ -866,8 +969,8 @@ func TestCreateInstallationToken_RetriesExhausted(t *testing.T) {
 	if !strings.Contains(err.Error(), "failed to create installation token") {
 		t.Errorf("CreateInstallationToken() error = %v, want containing 'failed to create installation token'", err)
 	}
-	if callCount != maxTokenCreationRetries {
-		t.Errorf("expected %d calls, got %d", maxTokenCreationRetries, callCount)
+	if callCount != maxRetries {
+		t.Errorf("expected %d calls, got %d", maxRetries, callCount)
 	}
 }
 
