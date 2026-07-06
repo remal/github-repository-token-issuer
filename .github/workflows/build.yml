@@ -54,7 +54,7 @@ jobs:
       run: terraform validate
     - name: Terraform - Plan
       working-directory: ./terraform
-      run: terraform plan
+      run: terraform plan -lock-timeout=5m
 
     - name: Go - Setup
       uses: actions/setup-go@v6
@@ -111,7 +111,7 @@ jobs:
     - name: Terraform - Apply
       if: ${{github.ref == 'refs/heads/main'}}
       working-directory: ./terraform
-      run: terraform apply -auto-approve
+      run: terraform apply -auto-approve -lock-timeout=5m
 
     - name: Go - Setup
       uses: actions/setup-go@v6
