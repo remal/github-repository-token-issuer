@@ -134,7 +134,11 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Create GitHub client with JWT
-	githubClient := NewGitHubClientWithJWT(jwtToken)
+	githubClient, err := NewGitHubClientWithJWT(jwtToken)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("failed to create GitHub client: %v", err), nil)
+		return
+	}
 
 	// Get installation ID for repository
 	installationID, err := GetInstallationID(ctx, githubClient.Apps, repository)

@@ -13,7 +13,7 @@ import (
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v86/github"
+	"github.com/google/go-github/v88/github"
 )
 
 // GetPrivateKey fetches the GitHub App private key from GCP Secret Manager.
@@ -87,7 +87,7 @@ func CreateJWT(privateKey *rsa.PrivateKey, appID string) (string, error) {
 
 // GitHubAppsService defines the GitHub Apps API methods used by this package.
 type GitHubAppsService interface {
-	FindRepositoryInstallation(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error)
+	GetRepositoryInstallation(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error)
 	CreateInstallationToken(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error)
 }
 
@@ -105,7 +105,7 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 
 	for attempt := range maxRetries {
 		var resp *github.Response
-		installation, resp, lastErr = apps.FindRepositoryInstallation(ctx, owner, repo)
+		installation, resp, lastErr = apps.GetRepositoryInstallation(ctx, owner, repo)
 		if lastErr == nil {
 			break
 		}
@@ -351,6 +351,6 @@ func VerifyRequestedScopes(requested map[string]string, granted *github.Installa
 }
 
 // NewGitHubClientWithJWT creates a GitHub client authenticated with a JWT.
-func NewGitHubClientWithJWT(jwtToken string) *github.Client {
-	return github.NewClient(nil).WithAuthToken(jwtToken)
+func NewGitHubClientWithJWT(jwtToken string) (*github.Client, error) {
+	return github.NewClient(github.WithAuthToken(jwtToken))
 }
