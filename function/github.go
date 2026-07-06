@@ -91,9 +91,9 @@ type GitHubAppsService interface {
 	CreateInstallationToken(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error)
 }
 
-const maxRetries = 4
+const maxRetries = 3
 
-var retryBackoffBase = 10 * time.Second
+var retryBackoffBase = 30 * time.Second
 
 // retryWithBackoff retries fn up to maxRetries times with exponential backoff
 // on server errors (>= 500) or network errors (nil response). The isNonRetryable

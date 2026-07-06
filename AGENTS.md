@@ -339,10 +339,10 @@ All timeouts must stay in sync. When changing retry parameters (count or backoff
 | Go context timeout | 5m | `function/handlers.go` | Cancels in-flight work (retries, API calls) |
 | curl `--max-time` | 300s | `action.yml` | Client-side limit for the token request |
 | curl `--max-time` (OIDC) | 10s | `action.yml` | Client-side limit for OIDC token fetch |
-| Retry backoff base | 10s | `function/github.go` | Base for exponential backoff (`10s, 20s, 40s`) |
-| Max retries | 4 | `function/github.go` | Per-function retry attempts |
+| Retry backoff base | 30s | `function/github.go` | Base for exponential backoff (`30s, 60s`) |
+| Max retries | 3 | `function/github.go` | Per-function retry attempts |
 
-Worst-case backoff per function: `10 + 20 + 40 = 70s`. Both functions can retry independently, so worst-case total sleep is 140s.
+Worst-case backoff per function: `30 + 60 = 90s`. Both functions can retry independently, so worst-case total sleep is 180s.
 
 ## Future Work
 

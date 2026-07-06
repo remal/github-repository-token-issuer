@@ -266,7 +266,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 ### Error Handling Strategy
 
-**Fail Fast Philosophy**: Return errors immediately without retries. Exception: transient GitHub API errors during installation lookup and token creation are retried up to `maxRetries` (4) times with exponential backoff (`2^attempt * 10s`: 10s, 20s, 40s). Client errors (403, 422, etc.) are never retried.
+**Fail Fast Philosophy**: Return errors immediately without retries. Exception: transient GitHub API errors during installation lookup and token creation are retried up to `maxRetries` (3) times with exponential backoff (`2^attempt * 30s`: 30s, 60s). Client errors (403, 422, etc.) are never retried.
 
 | Error                    | Status | When                              | Action                     |
 |--------------------------|--------|-----------------------------------|----------------------------|
@@ -597,7 +597,7 @@ When parsing query parameters:
 
 **Failure Handling**:
 
-- **GitHub API Outage**: Installation lookup and token creation retry up to 4 times with exponential backoff for server errors (>= 500) or network errors. If all retries fail, returns 503
+- **GitHub API Outage**: Installation lookup and token creation retry up to 3 times with exponential backoff for server errors (>= 500) or network errors. If all retries fail, returns 503
 - **Secret Manager Unavailable**: Fail immediately (no caching or fallback)
 - **Archived Repository**: Attempt token issuance anyway; let GitHub API return error if necessary
 - **Suspended GitHub App Installation**: Return 403 with clear error message
