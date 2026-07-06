@@ -640,7 +640,7 @@ func TestGetInstallationID(t *testing.T) {
 
 func TestGetInstallationID_RetryOnNetworkError(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	callCount := 0
 
@@ -669,7 +669,7 @@ func TestGetInstallationID_RetryOnNetworkError(t *testing.T) {
 
 func TestGetInstallationID_RetryOn500(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	callCount := 0
 
@@ -698,7 +698,7 @@ func TestGetInstallationID_RetryOn500(t *testing.T) {
 
 func TestGetInstallationID_RetriesExhausted(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	callCount := 0
 
@@ -751,7 +751,7 @@ func TestGetInstallationID_NoRetryOn404(t *testing.T) {
 //  4. Verify error handling for various failure scenarios
 func TestCreateInstallationToken(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	testTime := time.Now().Add(1 * time.Hour)
 
@@ -888,7 +888,7 @@ func TestCreateInstallationToken(t *testing.T) {
 
 func TestCreateInstallationToken_RetryOn500(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	testTime := time.Now().Add(1 * time.Hour)
 	callCount := 0
@@ -921,7 +921,7 @@ func TestCreateInstallationToken_RetryOn500(t *testing.T) {
 
 func TestCreateInstallationToken_RetryOn504(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	testTime := time.Now().Add(1 * time.Hour)
 	callCount := 0
@@ -954,7 +954,7 @@ func TestCreateInstallationToken_RetryOn504(t *testing.T) {
 
 func TestCreateInstallationToken_RetriesExhausted(t *testing.T) {
 	retryBackoffBase = time.Millisecond
-	t.Cleanup(func() { retryBackoffBase = time.Second })
+	t.Cleanup(func() { retryBackoffBase = 10 * time.Second })
 	ctx := context.Background()
 	callCount := 0
 

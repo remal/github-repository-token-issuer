@@ -91,6 +91,49 @@ type GitHubAppsService interface {
 	CreateInstallationToken(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error)
 }
 
+const maxRetries = 4
+
+var retryBackoffBase = 10 * time.Second
+
+// retryWithBackoff retries fn up to maxRetries times with exponential backoff
+// on server errors (>= 500) or network errors (nil response). The isNonRetryable
+// callback handles caller-specific error conditions that should fail immediately.
+func retryWithBackoff[T any](ctx context.Context, errMsg string, fn func() (T, *github.Response, error), isNonRetryable func(*github.Response, error) error) (T, error) {
+	var zero T
+	var lastErr error
+
+	for attempt := range maxRetries {
+		var resp *github.Response
+		var result T
+		result, resp, lastErr = fn()
+		if lastErr == nil {
+			return result, nil
+		}
+
+		if err := isNonRetryable(resp, lastErr); err != nil {
+			return zero, err
+		}
+
+		retryable := resp == nil || resp.StatusCode >= http.StatusInternalServerError
+		if !retryable {
+			return zero, fmt.Errorf("%s: %w", errMsg, lastErr)
+		}
+
+		if attempt < maxRetries-1 {
+			backoff := time.Duration(1<<uint(attempt)) * retryBackoffBase
+			timer := time.NewTimer(backoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return zero, ctx.Err()
+			case <-timer.C:
+			}
+		}
+	}
+
+	return zero, fmt.Errorf("%s: %w", errMsg, lastErr)
+}
+
 // GetInstallationID finds the GitHub App installation ID for the given repository.
 func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository string) (int64, error) {
 	parts := strings.Split(repository, "/")
@@ -100,39 +143,19 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 
 	owner, repo := parts[0], parts[1]
 
-	var installation *github.Installation
-	var lastErr error
-
-	for attempt := range maxRetries {
-		var resp *github.Response
-		installation, resp, lastErr = apps.GetRepositoryInstallation(ctx, owner, repo)
-		if lastErr == nil {
-			break
-		}
-
-		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			return 0, fmt.Errorf("GitHub App is not installed on repository %s", repository)
-		}
-
-		retryable := resp == nil || resp.StatusCode >= http.StatusInternalServerError
-		if !retryable {
-			return 0, fmt.Errorf("failed to find installation: %w", lastErr)
-		}
-
-		if attempt < maxRetries-1 {
-			backoff := time.Duration(1<<uint(attempt)) * retryBackoffBase
-			timer := time.NewTimer(backoff)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return 0, ctx.Err()
-			case <-timer.C:
+	installation, err := retryWithBackoff(ctx, "failed to find installation",
+		func() (*github.Installation, *github.Response, error) {
+			return apps.GetRepositoryInstallation(ctx, owner, repo)
+		},
+		func(resp *github.Response, _ error) error {
+			if resp != nil && resp.StatusCode == http.StatusNotFound {
+				return fmt.Errorf("GitHub App is not installed on repository %s", repository)
 			}
-		}
-	}
-
-	if lastErr != nil {
-		return 0, fmt.Errorf("failed to find installation: %w", lastErr)
+			return nil
+		},
+	)
+	if err != nil {
+		return 0, err
 	}
 
 	if installation == nil || installation.ID == nil {
@@ -141,10 +164,6 @@ func GetInstallationID(ctx context.Context, apps GitHubAppsService, repository s
 
 	return *installation.ID, nil
 }
-
-const maxRetries = 5
-
-var retryBackoffBase = time.Second
 
 // CreateInstallationToken requests an installation access token from GitHub with the specified permissions.
 func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, installationID int64, scopes map[string]string) (*github.InstallationToken, error) {
@@ -211,46 +230,24 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 		Permissions: permissions,
 	}
 
-	var token *github.InstallationToken
-	var lastErr error
-
-	for attempt := range maxRetries {
-		var resp *github.Response
-		token, resp, lastErr = apps.CreateInstallationToken(ctx, installationID, opts)
-		if lastErr == nil {
-			break
-		}
-
-		if resp != nil && resp.StatusCode == http.StatusForbidden {
-			return nil, fmt.Errorf("insufficient permissions for requested scopes")
-		}
-		if resp != nil && resp.StatusCode == http.StatusUnprocessableEntity {
-			return nil, fmt.Errorf("GitHub App installation is suspended or has insufficient permissions")
-		}
-
-		// Retry on server errors (>= 500) or network errors (nil response)
-		retryable := resp == nil || resp.StatusCode >= http.StatusInternalServerError
-		if !retryable {
-			return nil, fmt.Errorf("failed to create installation token: %w", lastErr)
-		}
-
-		if attempt < maxRetries-1 {
-			backoff := time.Duration(1<<uint(attempt)) * retryBackoffBase
-			timer := time.NewTimer(backoff)
-			select {
-			case <-ctx.Done():
-				timer.Stop()
-				return nil, ctx.Err()
-			case <-timer.C:
+	token, err := retryWithBackoff(ctx, "failed to create installation token",
+		func() (*github.InstallationToken, *github.Response, error) {
+			return apps.CreateInstallationToken(ctx, installationID, opts)
+		},
+		func(resp *github.Response, _ error) error {
+			if resp != nil && resp.StatusCode == http.StatusForbidden {
+				return fmt.Errorf("insufficient permissions for requested scopes")
 			}
-		}
+			if resp != nil && resp.StatusCode == http.StatusUnprocessableEntity {
+				return fmt.Errorf("GitHub App installation is suspended or has insufficient permissions")
+			}
+			return nil
+		},
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	if lastErr != nil {
-		return nil, fmt.Errorf("failed to create installation token: %w", lastErr)
-	}
-
-	// Verify that GitHub granted all requested scopes
 	if err := VerifyRequestedScopes(scopes, token.GetPermissions()); err != nil {
 		return nil, err
 	}
