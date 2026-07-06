@@ -491,9 +491,12 @@ func TestVerifyRequestedScopes(t *testing.T) {
 func TestNewGitHubClientWithJWT(t *testing.T) {
 	// Step 1: Create client with test token
 	token := "test-jwt-token"
-	client := NewGitHubClientWithJWT(token)
+	client, err := NewGitHubClientWithJWT(token)
 
-	// Step 2: Verify client is not nil
+	// Step 2: Verify no error and client is not nil
+	if err != nil {
+		t.Fatalf("NewGitHubClientWithJWT() returned error: %v", err)
+	}
 	if client == nil {
 		t.Error("NewGitHubClientWithJWT() returned nil")
 	}
@@ -505,7 +508,7 @@ type mockAppsService struct {
 	createInstallationToken func(ctx context.Context, id int64, opts *github.InstallationTokenOptions) (*github.InstallationToken, *github.Response, error)
 }
 
-func (m *mockAppsService) FindRepositoryInstallation(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error) {
+func (m *mockAppsService) GetRepositoryInstallation(ctx context.Context, owner, repo string) (*github.Installation, *github.Response, error) {
 	return m.findRepoInstallation(ctx, owner, repo)
 }
 
