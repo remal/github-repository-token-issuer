@@ -282,6 +282,8 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 **Targeted retries**: Both `FindRepositoryInstallation` and `CreateInstallationToken` GitHub API calls are retried on server errors (status >= 500) or network errors (nil response). This avoids redundant Secret Manager reads, OIDC validation, and JWT creation that a full-request retry would incur. All other errors (wrong config, insufficient permissions, client errors) fail immediately.
 
+**Client-side retries**: The composite action (`action.yml`) makes two curl requests, the OIDC token fetch and the installation token request, both through `curl-with-retry.sh`. It retries connection failures and HTTP 5xx up to 3 times with the same `30s, 60s` backoff and fails fast on 4xx, mirroring the server policy so a transient network blip does not fail the workflow.
+
 ## Security Considerations
 
 ### Private Key Security
