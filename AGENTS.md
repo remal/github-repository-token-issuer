@@ -44,12 +44,15 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 function/     # All Go code
 terraform/    # All infrastructure code
 action.yml    # Composite action in root
+curl-with-retry.sh           # curl wrapper with retry, used by action.yml
+curl-with-retry.test.sh      # Tests for curl-with-retry.sh
 .github/workflows/build.yml  # CI/CD
 ```
 
 **Never** create files in repository root except:
 
 - `action.yml` (already exists)
+- Helper scripts used by `action.yml` and their tests (e.g. `curl-with-retry.sh`, `curl-with-retry.test.sh`), which must sit next to the action so it can call them via `$GITHUB_ACTION_PATH`
 - Documentation (README.md, DEVELOPMENT.md, AGENTS.md)
 - Standard files (.gitignore, LICENSE, etc.)
 
@@ -102,7 +105,7 @@ Check for these files both at the repository root and in affected subdirectories
 - ❌ Metrics or observability
 - ❌ Token revocation
 - ❌ Custom token expiration
-- ❌ Additional testing infrastructure beyond existing unit tests
+- ❌ Additional testing infrastructure beyond the existing Go unit tests and the `curl-with-retry.sh` bash test
 - ❌ Documentation beyond README.md, DEVELOPMENT.md, AGENTS.md
 
 ## Code Style
@@ -339,10 +342,10 @@ All timeouts must stay in sync. When changing retry parameters (count or backoff
 | Go context timeout | 5m | `function/handlers.go` | Cancels in-flight work (retries, API calls) |
 | curl `--max-time` | 300s | `action.yml` | Client-side limit for the token request |
 | curl `--max-time` (OIDC) | 10s | `action.yml` | Client-side limit for OIDC token fetch |
-| Retry backoff base | 30s | `function/github.go` | Base for exponential backoff (`30s, 60s`) |
-| Max retries | 3 | `function/github.go` | Per-function retry attempts |
+| Retry backoff base | 30s | `function/github.go`, `curl-with-retry.sh` | Base for exponential backoff (`30s, 60s`), server and action client |
+| Max retries | 3 | `function/github.go`, `curl-with-retry.sh` | Retry attempts per server function and per action curl request |
 
-Worst-case backoff per function: `30 + 60 = 90s`. Both functions can retry independently, so worst-case total sleep is 180s.
+Worst-case backoff per function: `30 + 60 = 90s`. Both functions can retry independently, so worst-case total sleep is 180s. The action's client retry (`curl-with-retry.sh`) uses the same policy, adding up to `90s` of backoff per curl request (OIDC and token).
 
 ## Future Work
 

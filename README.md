@@ -185,6 +185,7 @@ The following organization permission scopes are allowed (read-only):
 ├── function/                  # Cloud Run service source code
 ├── terraform/                 # Infrastructure as Code
 ├── action.yml                 # Composite GitHub Action
+├── curl-with-retry.sh         # curl wrapper with retry, used by action.yml
 ├── .github/
 │   └── workflows/
 │       └── build.yml          # CI/CD deployment workflow
