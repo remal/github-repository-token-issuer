@@ -36,36 +36,16 @@ runs:
       run: |
         # Get GitHub OIDC Token
         OIDC_RESPONSE=$(mktemp)
-        OIDC_ERR=$(mktemp)
-        MAX_RETRIES=3
-        BACKOFF=30
-        for (( attempt=1; attempt<=MAX_RETRIES; attempt++ )); do
-          HTTP_CODE=$(curl --silent --show-error --max-time 10 --output "$OIDC_RESPONSE" --write-out '%{http_code}' \
-            --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer" 2>"$OIDC_ERR") || HTTP_CODE=000
-          RESPONSE=$(cat "$OIDC_RESPONSE")
-
-          if [[ "$HTTP_CODE" =~ ^2 ]]; then
-            break
-          fi
-
-          if [[ "$HTTP_CODE" != "000" && "$HTTP_CODE" -lt 500 ]]; then
-            echo "Error: Failed to get GitHub OIDC token (HTTP $HTTP_CODE)"
-            echo "$RESPONSE"
-            exit 1
-          fi
-
-          if (( attempt < MAX_RETRIES )); then
-            echo "OIDC token request failed (HTTP $HTTP_CODE), retrying in ${BACKOFF}s (attempt $attempt/$MAX_RETRIES)"
-            sleep "$BACKOFF"
-            BACKOFF=$(( BACKOFF * 2 ))
-          else
-            echo "Error: Failed to get GitHub OIDC token after $MAX_RETRIES attempts (HTTP $HTTP_CODE)"
-            cat "$OIDC_ERR"
-            echo "$RESPONSE"
-            exit 1
-          fi
-        done
+        HTTP_CODE=$(bash "$GITHUB_ACTION_PATH/curl-with-retry.sh" "$OIDC_RESPONSE" \
+          --max-time 10 \
+          --header "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+          "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=gh-repo-token-issuer")
+        RESPONSE=$(cat "$OIDC_RESPONSE")
+        if [[ ! "$HTTP_CODE" =~ ^2 ]]; then
+          echo "Error: Failed to get GitHub OIDC token (HTTP $HTTP_CODE)"
+          echo "$RESPONSE"
+          exit 1
+        fi
 
         if ! OIDC_TOKEN=$(echo "$RESPONSE" | jq --raw-output '.value // empty') || [[ -z "$OIDC_TOKEN" ]]; then
           echo "Error: Failed to get GitHub OIDC token"
@@ -107,12 +87,12 @@ runs:
           SERVICE_URL="https://gh-repo-token-issuer-db7udto7gq-uk.a.run.app"
         fi
         TOKEN_RESPONSE=$(mktemp)
-        HTTP_CODE=$(curl --silent --show-error --max-time 300 --request POST \
-          --output "$TOKEN_RESPONSE" --write-out '%{http_code}' \
+        HTTP_CODE=$(bash "$GITHUB_ACTION_PATH/curl-with-retry.sh" "$TOKEN_RESPONSE" \
+          --max-time 300 --request POST \
           --header "Authorization: Bearer $OIDC_TOKEN" \
           --header "Accept: application/json" \
           --header "Content-Length: 0" \
-          "${SERVICE_URL}/token?${SCOPES_QUERY}") || HTTP_CODE=000
+          "${SERVICE_URL}/token?${SCOPES_QUERY}")
         RESPONSE=$(cat "$TOKEN_RESPONSE")
         if [[ ! "$HTTP_CODE" =~ ^2 ]]; then
           echo "Error: Token request failed (HTTP $HTTP_CODE)"
