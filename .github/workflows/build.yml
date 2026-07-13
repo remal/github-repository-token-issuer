@@ -41,7 +41,7 @@ jobs:
 
     - name: Terraform - Read version
       id: terraform-version
-      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
     - name: Terraform - Setup
       uses: hashicorp/setup-terraform@v4
       with:
@@ -98,7 +98,7 @@ jobs:
     - name: Terraform - Read version
       if: ${{github.ref == 'refs/heads/main'}}
       id: terraform-version
-      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
     - name: Terraform - Setup
       if: ${{github.ref == 'refs/heads/main'}}
       uses: hashicorp/setup-terraform@v4
@@ -133,21 +133,21 @@ jobs:
       working-directory: ./function
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
-        docker build -t us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} .
-        docker push us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}
+        docker build -t "us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}" .
+        docker push "us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}"
 
     - name: Deploy to Cloud Run (no traffic)
       run: |
         SHORT_SHA=$(git rev-parse --short HEAD)
         gcloud run deploy gh-repo-token-issuer \
-          --image=us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA} \
+          --image="us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}" \
           --region=us-east4 \
           --no-traffic \
-          --tag=commit-${SHORT_SHA}
+          --tag="commit-${SHORT_SHA}"
 
     - name: Get short SHA
       id: short-sha
-      run: echo "value=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      run: echo "value=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
     - name: Validate deployed revision
       id: validate
@@ -180,12 +180,12 @@ jobs:
         SHORT_SHA=$(git rev-parse --short HEAD)
         gcloud run services update-traffic gh-repo-token-issuer \
           --region=us-east4 \
-          --to-tags=commit-${SHORT_SHA}=100
+          --to-tags="commit-${SHORT_SHA}=100"
 
     - name: Read project version
       if: ${{github.ref == 'refs/heads/main'}}
       id: project-version
-      run: echo "version=$(cat .version | tr -d '[:space:]')" >> $GITHUB_OUTPUT
+      run: echo "version=$(cat .version | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
     - name: Create tag
       if: ${{github.ref == 'refs/heads/main'}}
       uses: remal-github-actions/create-tag@v2
