@@ -41,7 +41,7 @@ jobs:
 
     - name: Terraform - Read version
       id: terraform-version
-      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+      run: echo "version=$(tr -d '[:space:]' < .terraform-version)" >> "$GITHUB_OUTPUT"
     - name: Terraform - Setup
       uses: hashicorp/setup-terraform@v4
       with:
@@ -104,7 +104,7 @@ jobs:
     - name: Terraform - Read version
       if: ${{github.ref == 'refs/heads/main'}}
       id: terraform-version
-      run: echo "version=$(cat .terraform-version | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+      run: echo "version=$(tr -d '[:space:]' < .terraform-version)" >> "$GITHUB_OUTPUT"
     - name: Terraform - Setup
       if: ${{github.ref == 'refs/heads/main'}}
       uses: hashicorp/setup-terraform@v4
@@ -191,7 +191,7 @@ jobs:
     - name: Read project version
       if: ${{github.ref == 'refs/heads/main'}}
       id: project-version
-      run: echo "version=$(cat .version | tr -d '[:space:]')" >> "$GITHUB_OUTPUT"
+      run: echo "version=$(tr -d '[:space:]' < .version)" >> "$GITHUB_OUTPUT"
     - name: Create tag
       if: ${{github.ref == 'refs/heads/main'}}
       uses: remal-github-actions/create-tag@v2
