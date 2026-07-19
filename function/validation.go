@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -118,13 +119,14 @@ func getPublicKey(jwks *JWKS, kid string) (*rsa.PublicKey, error) {
 	return nil, fmt.Errorf("key %s not found in JWKS", kid)
 }
 
-// ValidateAndExtractRepository validates the GitHub OIDC token and extracts the repository claim.
+// ValidateAndExtractIdentity validates the GitHub OIDC token and extracts the repository
+// claim and the numeric account ID of the repository owner (repository_owner_id).
 // Validates: signature (against GitHub's JWKS), issuer, audience, and expiration.
-func ValidateAndExtractRepository(ctx context.Context, tokenString string) (string, error) {
+func ValidateAndExtractIdentity(ctx context.Context, tokenString string) (string, int64, error) {
 	// Fetch JWKS
 	jwks, err := fetchJWKS(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch JWKS: %w", err)
+		return "", 0, fmt.Errorf("failed to fetch JWKS: %w", err)
 	}
 
 	// Parse and validate token
@@ -148,31 +150,42 @@ func ValidateAndExtractRepository(ctx context.Context, tokenString string) (stri
 		jwt.WithValidMethods([]string{"RS256"}))
 
 	if err != nil {
-		return "", fmt.Errorf("token validation failed: %w", err)
+		return "", 0, fmt.Errorf("token validation failed: %w", err)
 	}
 
 	if !token.Valid {
-		return "", fmt.Errorf("invalid token")
+		return "", 0, fmt.Errorf("invalid token")
 	}
 
 	// Extract claims
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
-		return "", fmt.Errorf("failed to extract claims")
+		return "", 0, fmt.Errorf("failed to extract claims")
 	}
 
 	// Extract repository claim
 	repository, ok := claims["repository"].(string)
 	if !ok || repository == "" {
-		return "", fmt.Errorf("repository claim not found in OIDC token")
+		return "", 0, fmt.Errorf("repository claim not found in OIDC token")
 	}
 
 	// Validate format (should be "owner/repo")
 	if !strings.Contains(repository, "/") {
-		return "", fmt.Errorf("invalid repository format: %s", repository)
+		return "", 0, fmt.Errorf("invalid repository format: %s", repository)
 	}
 
-	return repository, nil
+	// Extract repository owner account ID (GitHub encodes it as a decimal string).
+	// This is stable across owner renames, unlike the owner name.
+	ownerIDStr, ok := claims["repository_owner_id"].(string)
+	if !ok || ownerIDStr == "" {
+		return "", 0, fmt.Errorf("repository_owner_id claim not found in OIDC token")
+	}
+	ownerID, err := strconv.ParseInt(ownerIDStr, 10, 64)
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid repository_owner_id claim %q: %w", ownerIDStr, err)
+	}
+
+	return repository, ownerID, nil
 }
 
 // ValidateScopes validates requested scopes against allowlist and blacklist.
@@ -203,40 +216,38 @@ func ValidateScopes(scopes map[string]string) error {
 	return nil
 }
 
-// ParseAllowedOwners parses the GITHUB_ALLOWED_OWNERS environment variable.
-// Returns a slice of allowed owners (empty slice means all owners are allowed).
-// Format: comma-separated list of owner names, whitespace is trimmed.
-func ParseAllowedOwners() []string {
-	owners := []string{}
-	envValue := os.Getenv("GITHUB_ALLOWED_OWNERS")
+// ParseAllowedOwnerIDs parses the GITHUB_ALLOWED_OWNER_IDS environment variable.
+// Returns a slice of allowed owner account IDs (empty slice means all owners are allowed).
+// Format: comma-separated list of numeric account IDs, whitespace is trimmed.
+func ParseAllowedOwnerIDs() ([]int64, error) {
+	ownerIDs := []int64{}
+	envValue := os.Getenv("GITHUB_ALLOWED_OWNER_IDS")
 	for _, part := range strings.Split(envValue, ",") {
 		trimmed := strings.TrimSpace(part)
-		if trimmed != "" {
-			owners = append(owners, trimmed)
+		if trimmed == "" {
+			continue
 		}
+		id, err := strconv.ParseInt(trimmed, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid owner ID %q in GITHUB_ALLOWED_OWNER_IDS: %w", trimmed, err)
+		}
+		ownerIDs = append(ownerIDs, id)
 	}
-	return owners
+	return ownerIDs, nil
 }
 
-// ValidateOwnerAllowed validates that the repository owner is in the allowed list.
-// If allowedOwners is empty, all owners are allowed.
-// Repository format is expected to be "owner/repo".
-func ValidateOwnerAllowed(repository string, allowedOwners []string) error {
-	if len(allowedOwners) == 0 {
+// ValidateOwnerIDAllowed validates that the repository owner's account ID is in the allowed list.
+// If allowedOwnerIDs is empty, all owners are allowed.
+func ValidateOwnerIDAllowed(ownerID int64, allowedOwnerIDs []int64) error {
+	if len(allowedOwnerIDs) == 0 {
 		return nil
 	}
 
-	parts := strings.Split(repository, "/")
-	if len(parts) < 2 {
-		return fmt.Errorf("invalid repository format: %s", repository)
-	}
-	owner := parts[0]
-
-	for _, allowed := range allowedOwners {
-		if allowed == owner {
+	for _, allowed := range allowedOwnerIDs {
+		if allowed == ownerID {
 			return nil
 		}
 	}
 
-	return fmt.Errorf("repository owner '%s' is not allowed", owner)
+	return fmt.Errorf("repository owner ID %d is not allowed", ownerID)
 }

@@ -316,7 +316,7 @@ function/
 ├── Dockerfile     # Minimal image for Cloud Run
 ├── main.go        # Functions Framework entry point, startup validation
 ├── handlers.go    # TokenHandler, query param parsing, duplicate detection, response formatting
-├── validation.go  # ValidateScopes, ValidateAndExtractRepository
+├── validation.go  # ValidateScopes, ValidateAndExtractIdentity
 ├── scopes.go      # AllowedScopes map, BlacklistedScopes set
 ├── github.go      # GitHub API client, JWT creation, token issuance
 ├── go.mod         # Dependencies

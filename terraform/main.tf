@@ -143,10 +143,10 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
       }
 
       dynamic "env" {
-        for_each = length(var.github_allowed_owners) > 0 ? [1] : []
+        for_each = length(var.github_allowed_owner_ids) > 0 ? [1] : []
         content {
-          name  = "GITHUB_ALLOWED_OWNERS"
-          value = join(",", var.github_allowed_owners)
+          name  = "GITHUB_ALLOWED_OWNER_IDS"
+          value = join(",", var.github_allowed_owner_ids)
         }
       }
     }
