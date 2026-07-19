@@ -186,11 +186,13 @@ After deployment, Terraform provides:
 
 ## Updating Configuration
 
-To update environment variables or scaling settings, modify `main.tf` and run:
+The Cloud Run template is ignored by Terraform (deployments go through gcloud), so `terraform apply` does not update most service settings directly. The config env vars are the exception: set them in `terraform.tfvars` (`project_id`, `github_app_id`, `github_allowed_owner_ids`) and run `terraform apply`; a `terraform_data` resource then syncs them to the running service with `gcloud run services update`.
 
 ```bash
 terraform apply
 ```
+
+Scaling, memory, and image are managed through gcloud, not Terraform.
 
 ## Destroying Resources
 

@@ -142,6 +142,11 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
         value = var.github_app_id
       }
 
+      env {
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
+      }
+
       dynamic "env" {
         for_each = length(var.github_allowed_owner_ids) > 0 ? [1] : []
         content {
@@ -154,17 +159,41 @@ resource "google_cloud_run_v2_service" "github_token_issuer" {
     timeout = "300s"
   }
 
-  # Deployments are managed by gcloud, not Terraform
+  # Deployments are managed by gcloud, not Terraform. template[0] ignores the whole
+  # template subtree, so individual template fields (image, revision, etc.) are already
+  # covered and don't need to be listed separately.
   lifecycle {
     ignore_changes = [
       template[0],
-      template[0].containers[0].image,
-      template[0].containers[0].base_image_uri,
-      template[0].containers[0].command,
-      template[0].revision,
       client,
       client_version,
     ]
+  }
+}
+
+# Cloud Run env vars aren't managed through the service resource above: its template is
+# ignored (deployments go through gcloud), so this syncs the config env vars to the
+# running service with gcloud whenever any of their values change.
+resource "terraform_data" "env_vars" {
+  triggers_replace = {
+    app_id     = var.github_app_id
+    project_id = var.project_id
+    owner_ids  = join(",", var.github_allowed_owner_ids)
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      if [ -n "${join(",", var.github_allowed_owner_ids)}" ]; then
+        gcloud run services update ${google_cloud_run_v2_service.github_token_issuer.name} \
+          --region=${var.region} \
+          --update-env-vars=^@^GITHUB_APP_ID=${var.github_app_id}@GOOGLE_CLOUD_PROJECT=${var.project_id}@GITHUB_ALLOWED_OWNER_IDS=${join(",", var.github_allowed_owner_ids)}
+      else
+        gcloud run services update ${google_cloud_run_v2_service.github_token_issuer.name} \
+          --region=${var.region} \
+          --update-env-vars=^@^GITHUB_APP_ID=${var.github_app_id}@GOOGLE_CLOUD_PROJECT=${var.project_id} \
+          --remove-env-vars=GITHUB_ALLOWED_OWNER_IDS
+      fi
+    EOT
   }
 }
 

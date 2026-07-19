@@ -376,6 +376,7 @@ No logging is performed by the service to prevent accidental exposure of sensiti
 - **Image Registry**: Artifact Registry at `us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer`
 - **Infrastructure**: Terraform manages Cloud Run service, Artifact Registry, IAM, and supporting resources
   - Service image managed by CI/CD, not Terraform (via `lifecycle.ignore_changes`)
+  - Config env vars (`GITHUB_APP_ID`, `GOOGLE_CLOUD_PROJECT`, `GITHUB_ALLOWED_OWNER_IDS`) synced to the running service by a `terraform_data` gcloud provisioner, since the template is ignored; `FUNCTION_TARGET` is baked into the Docker image
 - **CI/CD**: GitHub Actions workflow (.github/workflows/build.yml)
   - Triggered on push to main branch
   - Steps: Lint → Terraform apply → Go build → Docker build/push → Cloud Run deploy
@@ -616,7 +617,7 @@ All infrastructure defined in `terraform/main.tf`:
 - Name: `gh-repo-token-issuer`
 - Region: User-configurable (e.g., `us-east4`)
 - Image: Managed by gcloud (placeholder in Terraform)
-- Environment variables: `GITHUB_APP_ID`
+- Environment variables: `GITHUB_APP_ID`, `GOOGLE_CLOUD_PROJECT`, and (optionally) `GITHUB_ALLOWED_OWNER_IDS`, synced to the running service by a `terraform_data` gcloud provisioner; `FUNCTION_TARGET` is baked into the Docker image
 - Scaling: 0-10 instances
 - Memory: 128Mi
 
@@ -654,9 +655,10 @@ All infrastructure defined in `terraform/main.tf`:
 
 ### Configuration Storage
 
-- **GitHub App ID**: Environment variable `GITHUB_APP_ID` on Cloud Run service
+- **GitHub App ID**: Environment variable `GITHUB_APP_ID` on Cloud Run service, set in `terraform.tfvars` and synced by a `terraform_data` gcloud provisioner on `terraform apply`
+- **GCP Project ID**: Environment variable `GOOGLE_CLOUD_PROJECT` on Cloud Run service (from `var.project_id`), synced the same way; used to locate the Secret Manager secret
 - **GitHub App Private Key**: GCP Secret Manager secret `github-app-private-key`
-- **GitHub Allowed Owner IDs**: Optional environment variable `GITHUB_ALLOWED_OWNER_IDS` on Cloud Run service (comma-separated list of allowed GitHub account IDs, stable across renames)
+- **GitHub Allowed Owner IDs**: Optional environment variable `GITHUB_ALLOWED_OWNER_IDS` on Cloud Run service (comma-separated list of allowed GitHub account IDs, stable across renames), set in `terraform.tfvars` and synced to the service by a `terraform_data` gcloud provisioner on `terraform apply`
 - **Scope Allowlist/Blacklist**: Hardcoded in Go source code (`function/scopes.go`)
 
 ### Startup Validation
