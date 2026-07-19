@@ -47,6 +47,10 @@ resource "google_artifact_registry_repository" "docker" {
   format        = "DOCKER"
   description   = "Docker images for GitHub Repository Token Issuer"
 
+  # Old images are deleted aggressively to keep storage cost down. Safe for the running
+  # service: Cloud Run keeps its own copy of a serving revision's image, so deleting the
+  # source here doesn't break serving or cold starts (https://docs.cloud.google.com/run/docs/deploying).
+  # Tradeoff: rollback is limited to recently built images.
   cleanup_policy_dry_run = false
 
   # Remove untagged images
