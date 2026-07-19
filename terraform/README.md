@@ -39,8 +39,14 @@ Create the bucket if it doesn't exist:
 ```bash
 gcloud storage buckets create gs://your-terraform-state-bucket \
   --location=us-east4 \
-  --uniform-bucket-level-access
+  --uniform-bucket-level-access \
+  --public-access-prevention
+
+# Versioning is not a create flag, so enable it separately
+gcloud storage buckets update gs://your-terraform-state-bucket --versioning
 ```
+
+The state bucket must use uniform bucket-level access, enforced public access prevention, and object versioning.
 
 ### 2. Configure Variables
 

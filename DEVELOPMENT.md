@@ -641,6 +641,7 @@ All infrastructure defined in `terraform/main.tf`:
 ### Terraform State Management
 
 - **Backend**: GCS bucket with state locking
+- **Bucket settings**: uniform bucket-level access, enforced public access prevention, and object versioning (versioning must be enabled with a separate `gcloud storage buckets update --versioning` call, since it is not a create flag)
 - **Configuration** (in `terraform/main.tf`):
   ```hcl
   terraform {
