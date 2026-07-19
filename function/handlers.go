@@ -115,10 +115,6 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 	// Get GCP project ID from environment
 	projectID := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	if projectID == "" {
-		// Try alternative environment variable
-		projectID = os.Getenv("GCP_PROJECT")
-	}
-	if projectID == "" {
 		writeError(w, http.StatusInternalServerError, "GCP project ID not configured", nil)
 		return
 	}
