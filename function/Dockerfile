@@ -2,7 +2,8 @@ FROM gcr.io/distroless/static-debian12:nonroot@sha256:aef9602f8710ec12bde19d593f
 
 COPY function /function
 
-ENV PORT=8080
+ENV FUNCTION_TARGET=TokenHandler
+
 EXPOSE 8080
 
 ENTRYPOINT ["/function"]
