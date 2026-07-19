@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// Note: OIDC token validation (ValidateAndExtractRepository) is tested via CI/CD integration
+// Note: OIDC token validation (ValidateAndExtractIdentity) is tested via CI/CD integration
 // as it requires valid GitHub-signed tokens and JWKS fetching.
 
 // TestValidateScopes tests the scope validation logic against allowlist and blacklist.
@@ -170,168 +170,159 @@ func TestValidateScopes(t *testing.T) {
 	}
 }
 
-// TestParseAllowedOwners tests parsing of the GITHUB_ALLOWED_OWNERS environment variable.
-func TestParseAllowedOwners(t *testing.T) {
+// TestParseAllowedOwnerIDs tests parsing of the GITHUB_ALLOWED_OWNER_IDS environment variable.
+func TestParseAllowedOwnerIDs(t *testing.T) {
 	tests := []struct {
 		name     string
 		envValue string
-		want     []string
+		want     []int64
+		wantErr  bool
 	}{
 		{
 			name:     "empty env var",
 			envValue: "",
-			want:     []string{},
+			want:     []int64{},
 		},
 		{
-			name:     "single owner",
-			envValue: "my-org",
-			want:     []string{"my-org"},
+			name:     "single owner ID",
+			envValue: "231188",
+			want:     []int64{231188},
 		},
 		{
-			name:     "multiple owners",
-			envValue: "org1,org2,org3",
-			want:     []string{"org1", "org2", "org3"},
+			name:     "multiple owner IDs",
+			envValue: "231188,77341723,77626445",
+			want:     []int64{231188, 77341723, 77626445},
 		},
 		{
-			name:     "owners with whitespace",
-			envValue: "  org1 , org2  ,  org3  ",
-			want:     []string{"org1", "org2", "org3"},
+			name:     "owner IDs with whitespace",
+			envValue: "  231188 , 77341723  ,  77626445  ",
+			want:     []int64{231188, 77341723, 77626445},
 		},
 		{
 			name:     "empty parts are skipped",
-			envValue: "org1,,org2",
-			want:     []string{"org1", "org2"},
+			envValue: "231188,,77341723",
+			want:     []int64{231188, 77341723},
 		},
 		{
 			name:     "only whitespace parts",
 			envValue: "  ,  ,  ",
-			want:     []string{},
+			want:     []int64{},
 		},
 		{
 			name:     "trailing comma",
-			envValue: "org1,org2,",
-			want:     []string{"org1", "org2"},
+			envValue: "231188,77341723,",
+			want:     []int64{231188, 77341723},
 		},
 		{
 			name:     "leading comma",
-			envValue: ",org1,org2",
-			want:     []string{"org1", "org2"},
+			envValue: ",231188,77341723",
+			want:     []int64{231188, 77341723},
+		},
+		{
+			name:     "non-numeric entry returns error",
+			envValue: "231188,remal",
+			wantErr:  true,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Set environment variable
-			t.Setenv("GITHUB_ALLOWED_OWNERS", tt.envValue)
+			t.Setenv("GITHUB_ALLOWED_OWNER_IDS", tt.envValue)
 
-			got := ParseAllowedOwners()
+			got, err := ParseAllowedOwnerIDs()
+
+			if tt.wantErr {
+				if err == nil {
+					t.Errorf("ParseAllowedOwnerIDs() error = nil, wantErr = true")
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("ParseAllowedOwnerIDs() unexpected error = %v", err)
+				return
+			}
 
 			if len(got) != len(tt.want) {
-				t.Errorf("ParseAllowedOwners() = %v, want %v", got, tt.want)
+				t.Errorf("ParseAllowedOwnerIDs() = %v, want %v", got, tt.want)
 				return
 			}
 			for i := range got {
 				if got[i] != tt.want[i] {
-					t.Errorf("ParseAllowedOwners()[%d] = %v, want %v", i, got[i], tt.want[i])
+					t.Errorf("ParseAllowedOwnerIDs()[%d] = %v, want %v", i, got[i], tt.want[i])
 				}
 			}
 		})
 	}
 }
 
-// TestValidateOwnerAllowed tests validation of repository owner against allowed list.
-func TestValidateOwnerAllowed(t *testing.T) {
+// TestValidateOwnerIDAllowed tests validation of repository owner account ID against allowed list.
+func TestValidateOwnerIDAllowed(t *testing.T) {
 	tests := []struct {
-		name          string
-		repository    string
-		allowedOwners []string
-		wantErr       bool
-		errContains   string
+		name            string
+		ownerID         int64
+		allowedOwnerIDs []int64
+		wantErr         bool
+		errContains     string
 	}{
 		{
-			name:          "empty allowed owners allows all",
-			repository:    "any-org/any-repo",
-			allowedOwners: []string{},
-			wantErr:       false,
+			name:            "empty allowed list allows all",
+			ownerID:         231188,
+			allowedOwnerIDs: []int64{},
+			wantErr:         false,
 		},
 		{
-			name:          "nil allowed owners allows all",
-			repository:    "any-org/any-repo",
-			allowedOwners: nil,
-			wantErr:       false,
+			name:            "nil allowed list allows all",
+			ownerID:         231188,
+			allowedOwnerIDs: nil,
+			wantErr:         false,
 		},
 		{
-			name:          "owner in allowed list",
-			repository:    "my-org/my-repo",
-			allowedOwners: []string{"my-org"},
-			wantErr:       false,
+			name:            "owner ID in allowed list",
+			ownerID:         231188,
+			allowedOwnerIDs: []int64{231188},
+			wantErr:         false,
 		},
 		{
-			name:          "owner in allowed list with multiple allowed",
-			repository:    "org2/some-repo",
-			allowedOwners: []string{"org1", "org2", "org3"},
-			wantErr:       false,
+			name:            "owner ID in allowed list with multiple allowed",
+			ownerID:         77341723,
+			allowedOwnerIDs: []int64{231188, 77341723, 77626445},
+			wantErr:         false,
 		},
 		{
-			name:          "owner not in allowed list",
-			repository:    "not-allowed/my-repo",
-			allowedOwners: []string{"org1", "org2"},
-			wantErr:       true,
-			errContains:   "repository owner 'not-allowed' is not allowed",
+			name:            "owner ID not in allowed list",
+			ownerID:         999999,
+			allowedOwnerIDs: []int64{231188, 77341723},
+			wantErr:         true,
+			errContains:     "repository owner ID 999999 is not allowed",
 		},
 		{
-			name:          "single allowed owner mismatch",
-			repository:    "other-org/repo",
-			allowedOwners: []string{"my-org"},
-			wantErr:       true,
-			errContains:   "repository owner 'other-org' is not allowed",
-		},
-		{
-			name:          "case sensitive comparison",
-			repository:    "My-Org/my-repo",
-			allowedOwners: []string{"my-org"},
-			wantErr:       true,
-			errContains:   "repository owner 'My-Org' is not allowed",
-		},
-		{
-			name:          "invalid repository format no slash",
-			repository:    "invalid-repo-format",
-			allowedOwners: []string{"my-org"},
-			wantErr:       true,
-			errContains:   "invalid repository format",
-		},
-		{
-			name:          "repository with nested path",
-			repository:    "owner/repo/extra",
-			allowedOwners: []string{"owner"},
-			wantErr:       false,
-		},
-		{
-			name:          "empty owner in repository",
-			repository:    "/repo",
-			allowedOwners: []string{"my-org"},
-			wantErr:       true,
-			errContains:   "repository owner '' is not allowed",
+			name:            "single allowed owner ID mismatch",
+			ownerID:         77626445,
+			allowedOwnerIDs: []int64{231188},
+			wantErr:         true,
+			errContains:     "repository owner ID 77626445 is not allowed",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateOwnerAllowed(tt.repository, tt.allowedOwners)
+			err := ValidateOwnerIDAllowed(tt.ownerID, tt.allowedOwnerIDs)
 
 			if tt.wantErr {
 				if err == nil {
-					t.Errorf("ValidateOwnerAllowed() error = nil, wantErr = true")
+					t.Errorf("ValidateOwnerIDAllowed() error = nil, wantErr = true")
 					return
 				}
 				if tt.errContains != "" && !strings.Contains(err.Error(), tt.errContains) {
-					t.Errorf("ValidateOwnerAllowed() error = %v, want error containing %q", err, tt.errContains)
+					t.Errorf("ValidateOwnerIDAllowed() error = %v, want error containing %q", err, tt.errContains)
 				}
 				return
 			}
 
 			if err != nil {
-				t.Errorf("ValidateOwnerAllowed() unexpected error = %v", err)
+				t.Errorf("ValidateOwnerIDAllowed() unexpected error = %v", err)
 			}
 		})
 	}

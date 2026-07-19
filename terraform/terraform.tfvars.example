@@ -9,6 +9,7 @@ region = "us-central1"
 # Your GitHub App ID (found in GitHub App settings)
 github_app_id = "123456"
 
-# Optional: List of GitHub repository owners allowed to request tokens
+# Optional: List of GitHub account IDs allowed to request tokens
 # If empty or not set, all owners are allowed
-# github_allowed_owners = ["my-org", "my-other-org", "my-username"]
+# Account IDs are stable across renames; look up an ID via https://api.github.com/users/<login>
+# github_allowed_owner_ids = ["12345678", "87654321"]

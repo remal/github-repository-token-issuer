@@ -14,8 +14,8 @@ variable "github_app_id" {
   type        = string
 }
 
-variable "github_allowed_owners" {
-  description = "List of GitHub repository owners (organizations or users) allowed to request tokens. If empty, all owners are allowed."
+variable "github_allowed_owner_ids" {
+  description = "List of GitHub account IDs (organizations or users) allowed to request tokens. Account IDs are stable across renames, unlike owner names. If empty, all owners are allowed."
   type        = list(string)
   default     = []
 }

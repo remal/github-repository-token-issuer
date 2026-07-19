@@ -58,16 +58,20 @@ func TokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate OIDC token and extract repository
-	repository, err := ValidateAndExtractRepository(ctx, oidcToken)
+	// Validate OIDC token and extract repository and owner account ID
+	repository, ownerID, err := ValidateAndExtractIdentity(ctx, oidcToken)
 	if err != nil {
 		writeError(w, http.StatusUnauthorized, fmt.Sprintf("invalid OIDC token: %v", err), nil)
 		return
 	}
 
-	// Validate repository owner is allowed (if GITHUB_ALLOWED_OWNERS is configured)
-	allowedOwners := ParseAllowedOwners()
-	if err := ValidateOwnerAllowed(repository, allowedOwners); err != nil {
+	// Validate repository owner is allowed (if GITHUB_ALLOWED_OWNER_IDS is configured)
+	allowedOwnerIDs, err := ParseAllowedOwnerIDs()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error(), nil)
+		return
+	}
+	if err := ValidateOwnerIDAllowed(ownerID, allowedOwnerIDs); err != nil {
 		writeError(w, http.StatusForbidden, err.Error(), nil)
 		return
 	}

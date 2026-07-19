@@ -59,8 +59,9 @@ github_app_id = "123456"  # Your GitHub App ID
 # Optional: Override default region (default: us-east4)
 # region = "us-central1"
 
-# Optional: Restrict which repository owners can request tokens
-# github_allowed_owners = ["my-org", "my-username"]
+# Optional: Restrict which owners can request tokens (by GitHub account ID, stable across renames)
+# Look up an ID via https://api.github.com/users/<login>
+# github_allowed_owner_ids = ["12345678", "87654321"]
 ```
 
 ### 3. Initialize Terraform

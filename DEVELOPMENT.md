@@ -84,7 +84,7 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
    └─> Validates GitHub OIDC token
        (signature against GitHub JWKS, issuer, audience, expiration)
    └─> Extracts repository claim from validated OIDC token
-   └─> Validates repository owner is allowed (if GITHUB_ALLOWED_OWNERS configured)
+   └─> Validates repository owner account ID is allowed (if GITHUB_ALLOWED_OWNER_IDS configured)
    └─> Parses query parameters for scopes
    └─> Calls validation logic
 
@@ -112,7 +112,7 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 2. Workflow calls Cloud Run with OIDC token in Authorization header
 3. Service validates GitHub OIDC token (signature, issuer, audience, expiration)
 4. Service extracts repository from validated OIDC claims
-5. Service validates repository owner is allowed (if GITHUB_ALLOWED_OWNERS configured)
+5. Service validates repository owner account ID is allowed (if GITHUB_ALLOWED_OWNER_IDS configured)
 6. Service parses scope permissions from query parameters
 7. Service validates scopes against hardcoded allowlist/blacklist
 8. Service fetches GitHub App private key from Secret Manager
@@ -160,7 +160,7 @@ terraform/             # Infrastructure as Code
 #### `function/validation.go`
 
 - `ValidateScopes()`: Check allowlist/blacklist and permission levels
-- `ValidateAndExtractRepository()`: Validate OIDC token and extract repository claim
+- `ValidateAndExtractIdentity()`: Validate OIDC token, extract repository claim and owner account ID
 - OIDC token signature validation against GitHub's JWKS
 - Issuer, audience, and expiration validation
 
@@ -192,9 +192,9 @@ The function validates the GitHub OIDC token from the `Authorization: Bearer` he
 4. **Expiration check**
 
 ```go
-// Validate OIDC token and extract repository claim
+// Validate OIDC token and extract repository claim and owner account ID
 // Expected format: "owner/repo"
-repository, err := ValidateAndExtractRepository(ctx, oidcToken)
+repository, ownerID, err := ValidateAndExtractIdentity(ctx, oidcToken)
 ```
 
 The function performs full cryptographic validation of the OIDC token, ensuring that only legitimate GitHub Actions workflows can request tokens.
@@ -274,7 +274,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 | Invalid scope            | 400    | Scope not in allowlist            | Reject request             |
 | Blacklisted scope        | 400    | Scope in blacklist                | Reject request             |
 | Invalid OIDC             | 401    | OIDC validation failed            | Reject request             |
-| Owner not allowed        | 403    | Owner not in GITHUB_ALLOWED_OWNERS| Reject request             |
+| Owner not allowed        | 403    | Owner ID not in GITHUB_ALLOWED_OWNER_IDS | Reject request      |
 | App not installed        | 403    | GitHub App not on repo            | Reject request             |
 | Insufficient permissions | 403    | App lacks permission              | Reject request             |
 | Secret Manager error     | 500    | Can't fetch private key           | Reject request             |
@@ -517,9 +517,10 @@ The service is publicly accessible (no GCP IAM layer), but the function performs
 
 ### Required OIDC Claims
 
-The function extracts the following claim from the OIDC token:
+The function extracts the following claims from the OIDC token:
 
-- **`repository`**: Used to identify which repository the token should be issued for (format: "owner/repo")
+- **`repository`**: Used to identify which repository the token should be issued for (format: "owner/repo"). Used for the installation lookup and error messages.
+- **`repository_owner_id`**: The numeric GitHub account ID of the repository owner. Used for the owner allowlist (`GITHUB_ALLOWED_OWNER_IDS`); stable across owner renames.
 
 ### Token Management
 
@@ -654,7 +655,7 @@ All infrastructure defined in `terraform/main.tf`:
 
 - **GitHub App ID**: Environment variable `GITHUB_APP_ID` on Cloud Run service
 - **GitHub App Private Key**: GCP Secret Manager secret `github-app-private-key`
-- **GitHub Allowed Owners**: Optional environment variable `GITHUB_ALLOWED_OWNERS` on Cloud Run service (comma-separated list of allowed repository owners)
+- **GitHub Allowed Owner IDs**: Optional environment variable `GITHUB_ALLOWED_OWNER_IDS` on Cloud Run service (comma-separated list of allowed GitHub account IDs, stable across renames)
 - **Scope Allowlist/Blacklist**: Hardcoded in Go source code (`function/scopes.go`)
 
 ### Startup Validation
