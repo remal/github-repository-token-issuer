@@ -925,6 +925,8 @@ gcloud run services update-traffic gh-repo-token-issuer \
 8. **Validate**: Use composite action with `service_tag` to request token from canary, verify write access by creating commit status
 9. **Migrate traffic**: Route 100% traffic to new revision if validation passes
 
+On the `main` branch the deploy job runs in the `main` GitHub environment (the `environment:` name resolves to `main` only for `refs/heads/main`, and to an empty string otherwise), so each main run registers a GitHub deployment whose status tracks the deploy job. Non-main runs (PRs, `workflow_dispatch`) use an empty environment name and register no deployment.
+
 **Triggered on**: Push to `main` branch
 
 ## Adding New Scopes
