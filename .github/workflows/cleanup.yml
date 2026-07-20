@@ -39,46 +39,46 @@ jobs:
         ONE_HOUR_AGO=$(date -u -d '1 hour ago' +%Y-%m-%dT%H:%M:%SZ)
 
         # Get the latest revision name
-        LATEST_REVISION=$(gcloud run services describe "$SERVICE" \
-          --region="$REGION" \
+        LATEST_REVISION=$(gcloud run services describe "${SERVICE}" \
+          --region="${REGION}" \
           --format='value(status.latestCreatedRevisionName)')
 
         # Get revisions serving traffic (>0%)
-        TRAFFIC_REVISIONS=$(gcloud run services describe "$SERVICE" \
-          --region="$REGION" \
+        TRAFFIC_REVISIONS=$(gcloud run services describe "${SERVICE}" \
+          --region="${REGION}" \
           --format='json(status.traffic)' | \
           jq -r '.status.traffic[] | select(.percent > 0) | .revisionName')
 
         # List all revisions with creation time
         ALL_REVISIONS=$(gcloud run revisions list \
-          --service="$SERVICE" \
-          --region="$REGION" \
+          --service="${SERVICE}" \
+          --region="${REGION}" \
           --format='value(name,metadata.creationTimestamp)')
 
         # Process each revision
         while IFS=$'\t' read -r NAME CREATED; do
-          [ -z "$NAME" ] && continue
+          [[ -z "${NAME}" ]] && continue
 
           # Check: is this the latest revision?
-          if [ "$NAME" == "$LATEST_REVISION" ]; then
-            echo "$NAME - SKIP - latest revision"
+          if [[ "${NAME}" == "${LATEST_REVISION}" ]]; then
+            echo "${NAME} - SKIP - latest revision"
             continue
           fi
 
           # Check: is this revision serving traffic?
-          if echo "$TRAFFIC_REVISIONS" | grep -q "^${NAME}$"; then
-            echo "$NAME - SKIP - serving traffic"
+          if echo "${TRAFFIC_REVISIONS}" | grep -q "^${NAME}$"; then
+            echo "${NAME} - SKIP - serving traffic"
             continue
           fi
 
           # Check: is this revision less than 1 hour old?
-          if [[ "$CREATED" > "$ONE_HOUR_AGO" ]]; then
-            echo "$NAME - SKIP - too recent (created $CREATED)"
+          if [[ "${CREATED}" > "${ONE_HOUR_AGO}" ]]; then
+            echo "${NAME} - SKIP - too recent (created ${CREATED})"
             continue
           fi
 
-          echo "$NAME - DELETE - created $CREATED"
-          gcloud run revisions delete "$NAME" \
-            --region="$REGION" \
+          echo "${NAME} - DELETE - created ${CREATED}"
+          gcloud run revisions delete "${NAME}" \
+            --region="${REGION}" \
             --quiet
-        done <<< "$ALL_REVISIONS"
+        done <<< "${ALL_REVISIONS}"

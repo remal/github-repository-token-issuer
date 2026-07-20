@@ -41,7 +41,9 @@ jobs:
 
     - name: Terraform - Read version
       id: terraform-version
-      run: echo "version=$(tr -d '[:space:]' < .terraform-version)" >> "$GITHUB_OUTPUT"
+      run: |
+        version="$(tr -d '[:space:]' < .terraform-version)"
+        echo "version=${version}" >> "${GITHUB_OUTPUT}"
     - name: Terraform - Setup
       uses: hashicorp/setup-terraform@v4
       with:
@@ -104,7 +106,9 @@ jobs:
     - name: Terraform - Read version
       if: ${{github.ref == 'refs/heads/main'}}
       id: terraform-version
-      run: echo "version=$(tr -d '[:space:]' < .terraform-version)" >> "$GITHUB_OUTPUT"
+      run: |
+        version="$(tr -d '[:space:]' < .terraform-version)"
+        echo "version=${version}" >> "${GITHUB_OUTPUT}"
     - name: Terraform - Setup
       if: ${{github.ref == 'refs/heads/main'}}
       uses: hashicorp/setup-terraform@v4
@@ -153,7 +157,9 @@ jobs:
 
     - name: Get short SHA
       id: short-sha
-      run: echo "value=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      run: |
+        value="$(git rev-parse --short HEAD)"
+        echo "value=${value}" >> "${GITHUB_OUTPUT}"
 
     - name: Validate deployed revision
       id: validate
@@ -172,10 +178,10 @@ jobs:
           -H "Accept: application/vnd.github+json" \
           "https://api.github.com/repos/${{github.repository}}/statuses/${{github.sha}}" \
           -d '{"state":"success","context":"token-validation","description":"Installation token write access verified"}')
-        if [[ "$HTTP_CODE" == "201" ]]; then
+        if [[ "${HTTP_CODE}" == "201" ]]; then
           echo "Token validation passed - statuses:write verified"
         else
-          echo "Token validation failed (HTTP $HTTP_CODE):"
+          echo "Token validation failed (HTTP ${HTTP_CODE}):"
           cat /tmp/status-response.json
           exit 1
         fi
@@ -191,7 +197,9 @@ jobs:
     - name: Read project version
       if: ${{github.ref == 'refs/heads/main'}}
       id: project-version
-      run: echo "version=$(tr -d '[:space:]' < .version)" >> "$GITHUB_OUTPUT"
+      run: |
+        version="$(tr -d '[:space:]' < .version)"
+        echo "version=${version}" >> "${GITHUB_OUTPUT}"
     - name: Create tag
       if: ${{github.ref == 'refs/heads/main'}}
       uses: remal-github-actions/create-tag@v2
