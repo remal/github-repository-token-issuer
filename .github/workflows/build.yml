@@ -54,6 +54,20 @@ jobs:
     - name: Terraform - Validate
       working-directory: ./terraform
       run: terraform validate
+
+    - name: TFLint - Setup
+      uses: terraform-linters/setup-tflint@v6
+      with:
+        tflint_version_file: .tool-versions
+    - name: TFLint - Init
+      working-directory: ./terraform
+      run: tflint --init
+      env:
+        GITHUB_TOKEN: ${{github.token}}
+    - name: TFLint - Run
+      working-directory: ./terraform
+      run: tflint -f compact
+
     - name: Terraform - Plan
       working-directory: ./terraform
       run: terraform plan -lock-timeout=5m

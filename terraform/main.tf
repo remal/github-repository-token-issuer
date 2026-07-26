@@ -75,11 +75,6 @@ resource "google_artifact_registry_repository" "docker" {
   depends_on = [google_project_service.artifactregistry]
 }
 
-# Data source to get project number
-data "google_project" "project" {
-  project_id = var.project_id
-}
-
 # Service Account for Cloud Run
 resource "google_service_account" "cloud_run_sa" {
   account_id   = "gh-repo-token-issuer-sa"
