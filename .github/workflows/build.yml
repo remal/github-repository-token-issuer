@@ -72,6 +72,26 @@ jobs:
       working-directory: ./terraform
       run: terraform plan -lock-timeout=5m
 
+    - name: Trivy - Read version
+      id: trivy-version
+      run: |
+        version=$(awk '$1 == "trivy" { print $2 }' .tool-versions)
+        if [[ -z "${version}" ]]; then
+          echo "::error::No 'trivy <version>' line found in .tool-versions"
+          exit 1
+        fi
+        echo "version=v${version}" | tee -a "${GITHUB_OUTPUT}"
+    - name: Trivy - Setup
+      uses: aquasecurity/setup-trivy@v0.3.1
+      with:
+        version: ${{steps.trivy-version.outputs.version}}
+        cache: true
+    # Terraform + Dockerfile misconfiguration, go.sum vulnerabilities, and
+    # secrets, repo-wide. Runs early to fail fast before spending time on the
+    # Go build and Docker image steps below.
+    - name: Trivy - Scan
+      run: trivy fs . --exit-code 1 --ignore-unfixed --scanners vuln,misconfig,secret --skip-dirs terraform/.terraform
+
     - name: Go - Setup
       uses: actions/setup-go@v7
       with:
@@ -92,6 +112,28 @@ jobs:
       run: go test -v ./...
       env:
         GITHUB_APP_ID: "1"
+
+    - name: Go - Build image binary
+      working-directory: ./function
+      env:
+        CGO_ENABLED: '0'
+        GOOS: linux
+        GOARCH: amd64
+      run: go build -ldflags="-s -w" -o function .
+    - name: Docker - Build image
+      working-directory: ./function
+      run: docker build -t gh-repo-token-issuer:ci .
+    - name: Trivy - Scan image
+      run: trivy image gh-repo-token-issuer:ci --exit-code 1 --ignore-unfixed --scanners vuln
+    # Passed the scan, so this exact image (not a rebuild) is what deploy pushes.
+    - name: Docker - Save image
+      run: docker save gh-repo-token-issuer:ci -o /tmp/gh-repo-token-issuer.tar
+    - name: Docker - Upload image artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: gh-repo-token-issuer-image
+        path: /tmp/gh-repo-token-issuer.tar
+        retention-days: 1
 
   deploy:
     if: >-
@@ -138,27 +180,21 @@ jobs:
       working-directory: ./terraform
       run: terraform apply -auto-approve -lock-timeout=5m
 
-    - name: Go - Setup
-      uses: actions/setup-go@v7
-      with:
-        go-version: '1.26'
-        cache-dependency-path: function/go.sum
-    - name: Go - Build
-      working-directory: ./function
-      env:
-        CGO_ENABLED: '0'
-        GOOS: linux
-        GOARCH: amd64
-      run: go build -ldflags="-s -w" -o function .
-
     - name: Configure Docker for Artifact Registry
       run: gcloud auth configure-docker us-east4-docker.pkg.dev --quiet
 
-    - name: Build and push Docker image
-      working-directory: ./function
+    - name: Docker - Download image artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: gh-repo-token-issuer-image
+        path: /tmp
+
+    # Loads the exact image build already scanned, no rebuild.
+    - name: Docker - Load and push image
       run: |
+        docker load -i /tmp/gh-repo-token-issuer.tar
         SHORT_SHA=$(git rev-parse --short HEAD)
-        docker build -t "us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}" .
+        docker tag gh-repo-token-issuer:ci "us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}"
         docker push "us-east4-docker.pkg.dev/gh-repo-token-issuer/gh-repo-token-issuer/function:${SHORT_SHA}"
 
     - name: Deploy to Cloud Run (no traffic)

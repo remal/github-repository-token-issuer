@@ -1,0 +1,7 @@
+# Trivy findings ignored repo-wide. One finding ID per line.
+
+# AVD-DS-0026: "No HEALTHCHECK defined" (LOW). HEALTHCHECK can only execute a
+# command; the distroless static base has no shell and no curl/wget, so
+# there's no command it could run. Cloud Run also never reads a Dockerfile
+# HEALTHCHECK: it uses its own startup/liveness probes instead.
+AVD-DS-0026
