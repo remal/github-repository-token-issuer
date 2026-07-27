@@ -88,9 +88,12 @@ jobs:
         cache: true
     # Terraform + Dockerfile misconfiguration, go.sum vulnerabilities, and
     # secrets, repo-wide. Runs early to fail fast before spending time on the
-    # Go build and Docker image steps below.
+    # Go build and Docker image steps below. gha-creds-*.json is the live
+    # credentials file google-github-actions/auth writes into the workspace
+    # for the GCP - Authenticate step above; it's a real secret but not one
+    # from this repo, so it's excluded rather than ignored by finding ID.
     - name: Trivy - Scan
-      run: trivy fs . --exit-code 1 --ignore-unfixed --scanners vuln,misconfig,secret --skip-dirs terraform/.terraform
+      run: trivy fs . --exit-code 1 --ignore-unfixed --scanners vuln,misconfig,secret --skip-dirs terraform/.terraform --skip-files 'gha-creds-*.json'
 
     - name: Go - Setup
       uses: actions/setup-go@v7
