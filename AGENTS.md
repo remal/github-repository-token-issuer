@@ -24,7 +24,7 @@ Project-specific guidelines for AI-assisted development of the GitHub Repository
 1. **Stateless** - No database or persistent storage, all validation happens per-request
 2. **Fail Fast** - Immediate error responses, no fallbacks. Exception: transient GitHub API server errors (status >= 500) and network errors during installation lookup and token creation are retried with exponential backoff
 3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request (exception: JWKS is cached for 1 hour)
-4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
+4. **No Observability** - No application logging, metrics, or monitoring (intentional cost/complexity reduction). Exception: GCP Cloud Audit Logging (Admin Activity, Data Access read/write) is enabled for all services at the project level via Terraform; this is platform-level access logging for security, not application observability.
 
 ## Technology Stack
 

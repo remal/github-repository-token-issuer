@@ -110,6 +110,8 @@ This configuration creates the following GCP resources:
 - **Artifact Registry Repository** - Docker container registry (with cleanup policies: deletes untagged images and images older than 1 hour)
 - **Secret Manager Secret** (`github-app-private-key`) - Stores GitHub App private key
 - **IAM Bindings** - Public access for Cloud Run invocation and Secret Manager access for service account
+- **Project IAM Audit Config** - Cloud Audit Logging (Admin Activity reads, Data Access reads and writes) enabled for all GCP services in the project
+- **Logging Bucket Config** - 365-day retention on the `_Default` log bucket that stores the Data Access audit logs above
 
 ### Resource Dependency Diagram
 
@@ -149,6 +151,8 @@ Notes:
    - Secret has prevent_destroy lifecycle (won't be deleted on terraform destroy)
    - Secret version (private key value) is added manually via gcloud
    - Service is publicly accessible; security is enforced by GitHub OIDC token validation
+   - Project IAM Audit Config and Logging Bucket Config (not shown above) depend only on
+     the project itself, not on any other resource in this diagram
 ```
 
 ## Deploying Code Changes
@@ -232,7 +236,7 @@ gcloud auth configure-docker us-east4-docker.pkg.dev
 
 ## Notes
 
-- **No Logging**: This service intentionally has no logging enabled to reduce costs and complexity
+- **No Application Logging**: The service itself intentionally has no application-level logging to reduce cost and complexity. This is separate from the project-wide Cloud Audit Logging (Data Access read/write) enabled via `google_project_iam_audit_config`, which is platform-level access logging, not something the application code produces.
 - **Stateless**: No persistent storage; all state is managed per-request
 - **Auto-scaling**: Configured for 0-10 instances (uses Cloud Run default concurrency)
 - **Cost Optimization**: Minimum instances set to 0 to avoid idle charges

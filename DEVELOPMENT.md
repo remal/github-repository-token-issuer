@@ -38,7 +38,8 @@ The app is a stateless Cloud Run service that acts as a broker between GitHub Ac
 2. **Fail Fast** - Errors are returned immediately without retries to keep logic simple
 3. **No Caching** - Fetch fresh data from Secret Manager and GitHub API on every request to avoid stale data
    - *Exception*: GitHub's JWKS (public signing keys) is cached for 1 hour to reduce latency. This is safe because GitHub rarely rotates these keys.
-4. **No Observability** - No logging, no metrics, no monitoring (intentional cost/complexity reduction)
+4. **No Observability** - No application logging, metrics, or monitoring (intentional cost/complexity reduction)
+   - *Exception*: GCP Cloud Audit Logging (Admin Activity, Data Access read/write) is enabled for all services at the project level via Terraform. This is platform-level access logging for security visibility, not application observability.
 
 ### Architecture Diagram
 
@@ -297,7 +298,7 @@ token, _, err := client.Apps.CreateInstallationToken(ctx, installationID, opts)
 
 - Encrypted at rest
 - Access controlled via IAM
-- Audit logs for all access
+- Audit logs for all access, enforced project-wide by the `google_project_iam_audit_config` Terraform resource (see [Infrastructure Details](#gcp-resources-terraform-managed))
 
 **Usage**:
 
@@ -643,6 +644,18 @@ All infrastructure defined in `terraform/main.tf`:
 
 - Public access (`allUsers`) to invoke Cloud Run
 - Security is enforced by the function via GitHub OIDC token validation
+
+5. **Project IAM Audit Config**
+
+- Scope: `allServices` (every GCP service in the project)
+- Log types: `ADMIN_READ`, `DATA_READ`, `DATA_WRITE`
+- None of these are on by default (unlike Admin Activity logs, which Google always records); enabling them adds Cloud Logging storage cost proportional to project-wide API call volume
+
+6. **Logging Bucket Config**
+
+- Bucket: `_Default` (where the Data Access logs above are stored), location `global`
+- Retention: 365 days (configurable range is 1-3650 days; GCP's own default is 30 if unset)
+- Does not affect Admin Activity logs, which route to the separate `_Required` bucket with a fixed, non-configurable 400-day retention
 
 ### Terraform State Management
 

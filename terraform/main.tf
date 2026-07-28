@@ -40,6 +40,37 @@ resource "google_project_service" "artifactregistry" {
   disable_on_destroy = false
 }
 
+# Full Data Access audit logging for every GCP service in the project (admin reads,
+# data reads, data writes). None of these are on by default, unlike Admin Activity
+# logs, which Google always records regardless of this config.
+resource "google_project_iam_audit_config" "all_services" {
+  project = var.project_id
+  service = "allServices"
+
+  audit_log_config {
+    log_type = "ADMIN_READ"
+  }
+
+  audit_log_config {
+    log_type = "DATA_READ"
+  }
+
+  audit_log_config {
+    log_type = "DATA_WRITE"
+  }
+}
+
+# Retention for the audit logs enabled above. Data Access logs (ADMIN_READ, DATA_READ,
+# DATA_WRITE) route to the "_Default" log bucket, so this is what controls how long they
+# are kept. Admin Activity logs route to "_Required" instead, which has a fixed 400-day
+# retention that isn't configurable, so this resource has no effect on those.
+resource "google_logging_project_bucket_config" "default_retention" {
+  project        = var.project_id
+  location       = "global"
+  bucket_id      = "_Default"
+  retention_days = 365
+}
+
 # Artifact Registry repository for Docker images
 resource "google_artifact_registry_repository" "docker" {
   repository_id = "gh-repo-token-issuer"
