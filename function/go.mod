@@ -1,6 +1,6 @@
 module github.com/your-org/github-token-issuer/function
 
-go 1.25.8
+go 1.26.0
 
 require (
 	cloud.google.com/go/secretmanager v1.21.0
@@ -38,7 +38,7 @@ require (
 	go.uber.org/zap v1.28.0 // indirect
 	golang.org/x/crypto v0.55.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/oauth2 v0.37.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
