@@ -174,7 +174,7 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 	// add a corresponding case in this switch statement and in VerifyRequestedScopes below.
 	// Failure to do so will cause runtime errors for the new scope.
 	for scopeID, permission := range scopes {
-		permValue := github.Ptr(permission)
+		permValue := new(permission)
 
 		switch scopeID {
 		case "actions":
