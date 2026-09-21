@@ -13,7 +13,7 @@ import (
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	"cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v90/github"
+	"github.com/google/go-github/v91/github"
 )
 
 // GetPrivateKey fetches the GitHub App private key from GCP Secret Manager.
@@ -174,7 +174,7 @@ func CreateInstallationToken(ctx context.Context, apps GitHubAppsService, instal
 	// add a corresponding case in this switch statement and in VerifyRequestedScopes below.
 	// Failure to do so will cause runtime errors for the new scope.
 	for scopeID, permission := range scopes {
-		permValue := github.Ptr(permission)
+		permValue := new(permission)
 
 		switch scopeID {
 		case "actions":
