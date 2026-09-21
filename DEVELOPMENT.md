@@ -14,7 +14,6 @@ Technical implementation details and architecture documentation for the GitHub R
   - [Running Locally](#running-locally)
   - [Testing with curl](#testing-with-curl)
   - [Linting](#linting)
-  - [Security scanning](#security-scanning)
   - [Testing](#testing)
 - [Deployment](#deployment)
 - [Adding New Scopes](#adding-new-scopes)
@@ -761,20 +760,6 @@ cd function
 golangci-lint run
 ```
 
-### Security scanning
-
-Install [Trivy](https://trivy.dev/), pinned in [`.tool-versions`](.tool-versions):
-
-```bash
-mise install  # or, with asdf: asdf install
-```
-
-Run from the repository root:
-
-```bash
-mise exec -- trivy fs . --exit-code 1 --ignore-unfixed --scanners vuln,misconfig,secret --skip-dirs terraform/.terraform  # or, with asdf: trivy fs . --exit-code 1 --ignore-unfixed --scanners vuln,misconfig,secret --skip-dirs terraform/.terraform
-```
-
 ### Testing
 
 ```bash
@@ -949,16 +934,14 @@ gcloud run services update-traffic gh-repo-token-issuer \
 
 1. **Lint**: Run `golangci-lint` on `function/`
 2. **TFLint**: Run `tflint` on `terraform/`
-3. **Trivy (config + filesystem)**: Run `trivy fs` on the repository
-4. **Build**: Compile Go binary to verify build works
-5. **Terraform Plan**: Show infrastructure changes
-6. **Terraform Apply**: Apply infrastructure changes (main branch only)
-7. **Go Build**: Build Linux binary with `CGO_ENABLED=0`
-8. **Docker Build/Push**: Build image and push to Artifact Registry
-9. **Trivy (image)**: Run `trivy image` against a CI-only build of the image
-10. **Deploy (no traffic)**: Deploy new revision with `--no-traffic --tag=commit-<SHA>`
-11. **Validate**: Use composite action with `service_tag` to request token from canary, verify write access by creating commit status
-12. **Migrate traffic**: Route 100% traffic to new revision if validation passes
+3. **Build**: Compile Go binary to verify build works
+4. **Terraform Plan**: Show infrastructure changes
+5. **Terraform Apply**: Apply infrastructure changes (main branch only)
+6. **Go Build**: Build Linux binary with `CGO_ENABLED=0`
+7. **Docker Build/Push**: Build image and push to Artifact Registry
+8. **Deploy (no traffic)**: Deploy new revision with `--no-traffic --tag=commit-<SHA>`
+9. **Validate**: Use composite action with `service_tag` to request token from canary, verify write access by creating commit status
+10. **Migrate traffic**: Route 100% traffic to new revision if validation passes
 
 On the `main` branch the deploy job runs in the `main` GitHub environment (the `environment:` name resolves to `main` only for `refs/heads/main`, and to an empty string otherwise), so each main run registers a GitHub deployment whose status tracks the deploy job. Non-main runs (PRs, `workflow_dispatch`) use an empty environment name and register no deployment.
 

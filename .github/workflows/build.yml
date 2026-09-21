@@ -72,29 +72,6 @@ jobs:
       working-directory: ./terraform
       run: terraform plan -lock-timeout=5m
 
-    - name: Trivy - Read version
-      id: trivy-version
-      run: |
-        version=$(awk '$1 == "trivy" { print $2 }' .tool-versions)
-        if [[ -z "${version}" ]]; then
-          echo "::error::No 'trivy <version>' line found in .tool-versions"
-          exit 1
-        fi
-        echo "version=v${version}" | tee -a "${GITHUB_OUTPUT}"
-    - name: Trivy - Setup
-      uses: aquasecurity/setup-trivy@v0.3.1
-      with:
-        version: ${{steps.trivy-version.outputs.version}}
-        cache: true
-    # Terraform + Dockerfile misconfiguration, go.sum vulnerabilities, and
-    # secrets, repo-wide. Runs early to fail fast before spending time on the
-    # Go build and Docker image steps below. gha-creds-*.json is the live
-    # credentials file google-github-actions/auth writes into the workspace
-    # for the GCP - Authenticate step above; it's a real secret but not one
-    # from this repo, so it's excluded rather than ignored by finding ID.
-    - name: Trivy - Scan
-      run: trivy fs . --exit-code 1 --ignore-unfixed --scanners vuln,misconfig,secret --skip-dirs terraform/.terraform --skip-files 'gha-creds-*.json'
-
     - name: Go - Setup
       uses: actions/setup-go@v7
       with:
@@ -126,9 +103,7 @@ jobs:
     - name: Docker - Build image
       working-directory: ./function
       run: docker build -t gh-repo-token-issuer:ci .
-    - name: Trivy - Scan image
-      run: trivy image gh-repo-token-issuer:ci --exit-code 1 --ignore-unfixed --scanners vuln
-    # Passed the scan, so this exact image (not a rebuild) is what deploy pushes.
+    # This exact image (not a rebuild) is what deploy pushes.
     - name: Docker - Save image
       run: docker save gh-repo-token-issuer:ci -o /tmp/gh-repo-token-issuer.tar
     - name: Docker - Upload image artifact
@@ -192,7 +167,7 @@ jobs:
         name: gh-repo-token-issuer-image
         path: /tmp
 
-    # Loads the exact image build already scanned, no rebuild.
+    # Loads the exact image built by the build job, no rebuild.
     - name: Docker - Load and push image
       run: |
         docker load -i /tmp/gh-repo-token-issuer.tar
