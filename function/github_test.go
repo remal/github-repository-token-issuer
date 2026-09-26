@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/go-github/v91/github"
+	"github.com/google/go-github/v92/github"
 )
 
 // generateTestRSAKey creates a 2048-bit RSA key pair for testing JWT signing.
