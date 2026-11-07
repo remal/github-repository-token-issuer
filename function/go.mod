@@ -11,7 +11,7 @@ require (
 
 require (
 	cloud.google.com/go/auth v0.24.2 // indirect
-	cloud.google.com/go/auth/oauth2adapt v0.3.0 // indirect
+	cloud.google.com/go/auth/oauth2adapt v0.3.1 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	cloud.google.com/go/functions v1.27.1 // indirect
 	cloud.google.com/go/iam v1.15.1 // indirect
