@@ -10,8 +10,8 @@ cloud.google.com/go/functions v1.27.1 h1:p+kXYH9liSBgzTX32hpjSdD/LX38+LsB9wKAEdJ
 cloud.google.com/go/functions v1.27.1/go.mod h1:u8wVExXEa2Dz8VGZo56bNqXi/R1FjlZ6VE89EENoHpU=
 cloud.google.com/go/iam v1.15.1 h1:i6EXLKyIi0Sh72p+5+Fz0PfnzB63bkneVpaBCGrjlWs=
 cloud.google.com/go/iam v1.15.1/go.mod h1:nDJ/rfCzLKyBUY1AeiSQwOAJg/AN7zZ2QmNzRTcK2jM=
-cloud.google.com/go/secretmanager v1.23.0 h1:tUmPWfKapcrCsLXdJQIokbJamK5leTGAyxVhPXG1x90=
-cloud.google.com/go/secretmanager v1.23.0/go.mod h1:xDP/NNLKgQGGKcOenNnflIPW49MBj5w1EcakXjRLZHg=
+cloud.google.com/go/secretmanager v1.23.1 h1:i7GMED6jHSJS72VQbwyBsEw+vsHKbI18MJFEZ33t9N0=
+cloud.google.com/go/secretmanager v1.23.1/go.mod h1:S2EZCRLLtM7DEzGr73o5IvpmjCBacfzl0MXXyT4x//c=
 github.com/GoogleCloudPlatform/functions-framework-go v1.9.2 h1:Cev/PdoxY86bJjGwHJcpiWMhrZMVEoKp9wuEp9gCUvw=
 github.com/GoogleCloudPlatform/functions-framework-go v1.9.2/go.mod h1:wLEV4uSJztSBI+QyUy2fkHBuGFjRIAEDOqcEQ2hwmgE=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=
